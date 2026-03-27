@@ -40,5 +40,8 @@
 # debug information files
 *.dwo
 
-tests
+tests_runner
 program
+.clang-format
+
+tz.md
