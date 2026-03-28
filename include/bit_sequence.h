@@ -1,5 +1,4 @@
-#ifndef BIT_SEQUENCE_H
-#define BIT_SEQUENCE_H
+#pragma once
 
 #include <stdexcept>
 
@@ -118,5 +117,3 @@ template <class T> Sequence<T> *BitSequence::apply_mask(const Sequence<T> *sourc
     }
     return filtered;
 }
-
-#endif

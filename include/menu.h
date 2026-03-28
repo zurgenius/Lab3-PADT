@@ -1,6 +1,3 @@
-#ifndef MENU_H
-#define MENU_H
+#pragma once
 
 void run_menu();
-
-#endif

@@ -1,5 +1,4 @@
-#ifndef IENUMERATOR_H
-#define IENUMERATOR_H
+#pragma once
 
 template <class T> class IEnumerator {
   public:
@@ -35,5 +34,3 @@ template <class T> class EnumeratorWrapper {
         delete iter;
     }
 };
-
-#endif

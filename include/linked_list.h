@@ -1,5 +1,4 @@
-#ifndef LINKED_LIST_H
-#define LINKED_LIST_H
+#pragma once
 
 #include "ienumerator.h"
 
@@ -69,5 +68,3 @@ template <class T> class LinkedList {
 };
 
 #include "detail/linked_list.tpp"
-
-#endif

@@ -1,5 +1,4 @@
-#ifndef ALGORITHMS_H
-#define ALGORITHMS_H
+#pragma once
 
 #include <stdexcept>
 
@@ -56,5 +55,3 @@ inline Stats min_max_avg(const Sequence<int> *seq) {
     Stats stats = {min_value, max_value, static_cast<double>(sum) / seq->get_count()};
     return stats;
 }
-
-#endif

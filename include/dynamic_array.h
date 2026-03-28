@@ -1,5 +1,4 @@
-#ifndef ARRAY_H
-#define ARRAY_H
+#pragma once
 
 #include "ienumerator.h"
 
@@ -55,5 +54,3 @@ template <class T> class DynamicArray {
 };
 
 #include "detail/dynamic_array.tpp"
-
-#endif

@@ -1,5 +1,4 @@
-#ifndef OPTION_H
-#define OPTION_H
+#pragma once
 
 #include <stdexcept>
 
@@ -31,5 +30,3 @@ template <class T> class Option {
         return Option<T>(val);
     }
 };
-
-#endif

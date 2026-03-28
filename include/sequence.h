@@ -1,5 +1,4 @@
-#ifndef SEQUENCE_H
-#define SEQUENCE_H
+#pragma once
 
 #include "dynamic_array.h"
 #include "linked_list.h"
@@ -191,5 +190,3 @@ template <class T> class ImmutableListSequence : public ListSequence<T> {
 };
 
 #include "detail/sequence.tpp"
-
-#endif

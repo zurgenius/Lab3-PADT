@@ -1,5 +1,4 @@
-#ifndef BIT_H
-#define BIT_H
+#pragma once
 
 class Bit {
   private:
@@ -34,5 +33,3 @@ class Bit {
         return value != other.value;
     }
 };
-
-#endif
