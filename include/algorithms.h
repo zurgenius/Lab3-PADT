@@ -2,7 +2,7 @@
 
 #include <stdexcept>
 
-#include "sequence.h"
+#include "array_sequence.h"
 
 template <class T>
 Sequence<Sequence<T> *> *split(const Sequence<T> *seq,

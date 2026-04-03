@@ -1,7 +1,9 @@
 #include "menu.h"
 
 #include "algorithms.h"
+#include "array_sequence.h"
 #include "bit_sequence.h"
+#include "list_sequence.h"
 
 #include <cstdlib>
 #include <iostream>

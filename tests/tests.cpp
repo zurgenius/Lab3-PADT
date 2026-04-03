@@ -1,6 +1,7 @@
 #include "algorithms.h"
+#include "array_sequence.h"
 #include "bit_sequence.h"
-#include "sequence.h"
+#include "list_sequence.h"
 
 #include <gtest/gtest.h>
 

@@ -2,8 +2,8 @@
 
 #include <stdexcept>
 
+#include "array_sequence.h"
 #include "bit.h"
-#include "sequence.h"
 
 class BitSequence : public Sequence<Bit> {
 private:
