@@ -1,7 +1,7 @@
 #pragma once
 
 #include "linked_list.h"
-#include "sequence_base.h"
+#include "sequence.h"
 
 template <class T> class ListSequence : public Sequence<T> {
 protected:

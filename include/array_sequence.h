@@ -1,7 +1,7 @@
 #pragma once
 
 #include "dynamic_array.h"
-#include "sequence_base.h"
+#include "sequence.h"
 
 template <class T> class ArraySequence : public Sequence<T> {
 protected:

@@ -1,4 +1,4 @@
-#include "sequence_base.h"
+#include "sequence.h"
 
 #include <stdexcept>
 
