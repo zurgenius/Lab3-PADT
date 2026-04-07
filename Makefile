@@ -2,7 +2,7 @@ BUILD_DIR = build
 LINT_BUILD_DIR = build-lint
 FORMAT_FILES = $(shell find include src tests -type f \( -name '*.h' -o -name '*.cpp' -o -name '*.tpp' \))
 
-.PHONY: all configure program tests lint format clean
+.PHONY: all configure program run tests lint format clean
 
 all: program
 
@@ -12,6 +12,9 @@ configure:
 program: configure
 	cmake --build $(BUILD_DIR) --target lab2_program
 	cp $(BUILD_DIR)/program program
+
+run: program
+	./program
 
 tests: configure
 	cmake --build $(BUILD_DIR) --target lab2_tests
