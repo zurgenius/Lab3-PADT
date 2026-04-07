@@ -1,28 +1,28 @@
-CXX = g++
-CPPFLAGS = -Iinclude -Igoogletest/googletest/include -Igoogletest/googletest
-CXXFLAGS = -std=c++17 -Wall -Wextra -Wpedantic
-LINT_FLAGS = -Werror
-
-PROGRAM_SRCS = src/main.cpp src/menu.cpp src/bit_sequence.cpp
-TEST_SRCS = tests/tests.cpp src/bit_sequence.cpp \
-	googletest/googletest/src/gtest-all.cc \
-	googletest/googletest/src/gtest_main.cc
-TEST_BIN = tests_runner
+BUILD_DIR = build
+LINT_BUILD_DIR = build-lint
 FORMAT_FILES = $(shell find include src tests -type f \( -name '*.h' -o -name '*.cpp' -o -name '*.tpp' \))
 
-.PHONY: all program tests lint format clean
+.PHONY: all configure program tests lint format clean
 
 all: program
 
-program:
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(PROGRAM_SRCS) -o program
+configure:
+	cmake -S . -B $(BUILD_DIR)
 
-tests:
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(TEST_SRCS) -o $(TEST_BIN)
+program: configure
+	cmake --build $(BUILD_DIR) --target lab2_program
+	cp $(BUILD_DIR)/program program
+
+tests: configure
+	cmake --build $(BUILD_DIR) --target lab2_tests
+	ctest --test-dir $(BUILD_DIR) --output-on-failure
+	cp $(BUILD_DIR)/tests_runner tests_runner
 
 lint:
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(LINT_FLAGS) $(PROGRAM_SRCS) -o /tmp/lab2_program_lint
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(LINT_FLAGS) $(TEST_SRCS) -o /tmp/lab2_tests_lint
+	cmake -S . -B $(LINT_BUILD_DIR) -DLAB2_ENABLE_WERROR=ON
+	cmake --build $(LINT_BUILD_DIR) --target lab2_program
+	cmake --build $(LINT_BUILD_DIR) --target lab2_tests
+	ctest --test-dir $(LINT_BUILD_DIR) --output-on-failure
 
 format:
 	@if command -v clang-format >/dev/null 2>&1; then \
@@ -33,4 +33,4 @@ format:
 	fi
 
 clean:
-	rm -f program $(TEST_BIN) /tmp/lab2_program_lint /tmp/lab2_tests_lint
+	rm -rf $(BUILD_DIR) $(LINT_BUILD_DIR) program tests_runner

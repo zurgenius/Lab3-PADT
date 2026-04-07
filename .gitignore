@@ -42,6 +42,7 @@
 
 tests_runner
 program
-.clang-format
+build/
+build-lint/
 
 tz.md
