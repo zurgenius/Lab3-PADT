@@ -1,4 +1,3 @@
-#include "algorithms.h"
 #include "array_sequence.h"
 #include "list_sequence.h"
 #include "utils.h"
@@ -157,35 +156,4 @@ TEST(SequenceTest, SliceReplacesRequestedRange) {
     EXPECT_EQ(sliced->get(3), 5);
 
     delete sliced;
-}
-
-TEST(AlgorithmsTest, SplitProducesChunksBetweenDelimiters) {
-    int items[] = {1, 2, 0, 3, 0, 4};
-    MutableArraySequence<int> sequence(items, 6);
-
-    Sequence<Sequence<int> *> *groups = split(&sequence, utils::is_zero);
-    EXPECT_EQ(groups->get_count(), 3);
-    EXPECT_EQ(groups->get(0)->get_count(), 2);
-    EXPECT_EQ(groups->get(1)->get_count(), 1);
-    EXPECT_EQ(groups->get(2)->get(0), 4);
-
-    for (int index = 0; index < groups->get_count(); index++) {
-        delete groups->get(index);
-    }
-    delete groups;
-}
-
-TEST(AlgorithmsTest, ComputesMinMaxAvg) {
-    int items[] = {4, 1, 7, 2};
-    MutableListSequence<int> sequence(items, 4);
-
-    const Stats stats = min_max_avg(&sequence);
-    EXPECT_EQ(stats.min, 1);
-    EXPECT_EQ(stats.max, 7);
-    EXPECT_EQ(stats.avg, 3.5);
-}
-
-TEST(AlgorithmsTest, RejectsEmptySequenceForStats) {
-    MutableArraySequence<int> sequence;
-    EXPECT_THROW(min_max_avg(&sequence), std::invalid_argument);
 }

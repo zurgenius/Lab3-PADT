@@ -1,6 +1,5 @@
 #include "menu.h"
 
-#include "algorithms.h"
 #include "array_sequence.h"
 #include "list_sequence.h"
 #include "utils.h"
@@ -251,36 +250,6 @@ void menu_reduce() {
     std::cout << "Reduce(sum): " << sequences[index]->reduce(utils::sum, 0) << std::endl;
 }
 
-void menu_stats() {
-    const int index = select_sequence("Select sequence:");
-    if (index == -1) {
-        return;
-    }
-
-    try {
-        const Stats stats = min_max_avg(sequences[index]);
-        std::cout << "min=" << stats.min << ", max=" << stats.max << ", avg=" << stats.avg
-                  << std::endl;
-    } catch (const std::invalid_argument &e) {
-        std::cout << "Error: " << e.what() << std::endl;
-    }
-}
-
-void menu_split() {
-    const int index = select_sequence("Select sequence to split by zero:");
-    if (index == -1) {
-        return;
-    }
-
-    Sequence<Sequence<int> *> *groups = split(sequences[index], utils::is_zero);
-    for (int group = 0; group < groups->get_count(); group++) {
-        std::cout << "Group " << group << ": ";
-        utils::print_sequence(groups->get(group));
-        delete groups->get(group);
-    }
-    delete groups;
-}
-
 void menu_slice() {
     const int index = select_sequence("Select sequence:");
     if (index == -1) {
@@ -354,10 +323,8 @@ void run_menu() {
         std::cout << "7. Map (square)" << std::endl;
         std::cout << "8. Where (positive)" << std::endl;
         std::cout << "9. Reduce (sum)" << std::endl;
-        std::cout << "10. Split by zero" << std::endl;
-        std::cout << "11. Slice" << std::endl;
-        std::cout << "12. Stats" << std::endl;
-        std::cout << "13. Run tests" << std::endl;
+        std::cout << "10. Slice" << std::endl;
+        std::cout << "11. Run tests" << std::endl;
         std::cout << "0. Exit" << std::endl;
         std::cout << "Choice: ";
         utils::read_int(choice);
@@ -391,15 +358,9 @@ void run_menu() {
             menu_reduce();
             break;
         case 10:
-            menu_split();
-            break;
-        case 11:
             menu_slice();
             break;
-        case 12:
-            menu_stats();
-            break;
-        case 13:
+        case 11:
             menu_run_tests();
             break;
         case 0:

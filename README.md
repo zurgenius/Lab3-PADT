@@ -25,5 +25,5 @@
 - mutable / immutable варианты последовательностей
 - `Option<T>`
 - итераторы
-- `split`, `slice`, `min_max_avg`
+- `slice`
 - консольный UI
