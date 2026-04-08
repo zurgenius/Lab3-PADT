@@ -2,7 +2,6 @@
 
 #include "algorithms.h"
 #include "array_sequence.h"
-#include "bit_sequence.h"
 #include "list_sequence.h"
 #include "utils.h"
 
@@ -15,22 +14,11 @@ const int kMaxSequences = 10;
 Sequence<int> *sequences[kMaxSequences];
 int sequence_count = 0;
 
-BitSequence *bit_sequences[kMaxSequences];
-int bit_sequence_count = 0;
-
 bool store_sequence(Sequence<int> *sequence) {
     if (sequence_count >= kMaxSequences) {
         return false;
     }
     sequences[sequence_count++] = sequence;
-    return true;
-}
-
-bool store_bit_sequence(BitSequence *sequence) {
-    if (bit_sequence_count >= kMaxSequences) {
-        return false;
-    }
-    bit_sequences[bit_sequence_count++] = sequence;
     return true;
 }
 
@@ -63,28 +51,6 @@ int select_sequence(const char *prompt) {
     return index;
 }
 
-int select_bit_sequence(const char *prompt) {
-    if (bit_sequence_count == 0) {
-        std::cout << "No BitSequences created" << std::endl;
-        return -1;
-    }
-
-    std::cout << prompt << std::endl;
-    for (int index = 0; index < bit_sequence_count; index++) {
-        std::cout << index << ": ";
-        utils::print_bit_sequence(bit_sequences[index]);
-    }
-
-    std::cout << "Index: ";
-    int index = -1;
-    utils::read_int(index);
-    if (index < 0 || index >= bit_sequence_count) {
-        std::cout << "Invalid index" << std::endl;
-        return -1;
-    }
-    return index;
-}
-
 Sequence<int> *create_number_sequence(int kind) {
     switch (kind) {
     case 1:
@@ -106,33 +72,10 @@ void menu_create_sequence() {
     std::cout << "2. MutableListSequence<int>" << std::endl;
     std::cout << "3. ImmutableArraySequence<int>" << std::endl;
     std::cout << "4. ImmutableListSequence<int>" << std::endl;
-    std::cout << "5. BitSequence" << std::endl;
     std::cout << "Choice: ";
 
     int choice = 0;
     utils::read_int(choice);
-
-    if (choice == 5) {
-        std::cout << "Enter number of bits: ";
-        int count = 0;
-        utils::read_int(count);
-
-        BitSequence *sequence = new BitSequence();
-        for (int index = 0; index < count; index++) {
-            std::cout << "Bit " << index << " (0/1): ";
-            int value = 0;
-            utils::read_int(value);
-            sequence->append(Bit(value));
-        }
-
-        if (!store_bit_sequence(sequence)) {
-            delete sequence;
-            std::cout << "No free slots to store BitSequence" << std::endl;
-            return;
-        }
-        std::cout << "Stored as bit sequence " << (bit_sequence_count - 1) << std::endl;
-        return;
-    }
 
     Sequence<int> *sequence = create_number_sequence(choice);
     if (sequence == nullptr) {
@@ -176,7 +119,7 @@ void menu_add_element() {
 }
 
 void menu_print_all() {
-    if (sequence_count == 0 && bit_sequence_count == 0) {
+    if (sequence_count == 0) {
         std::cout << "No sequences created" << std::endl;
         return;
     }
@@ -185,12 +128,6 @@ void menu_print_all() {
     for (int index = 0; index < sequence_count; index++) {
         std::cout << "[" << index << "] ";
         utils::print_sequence(sequences[index]);
-    }
-
-    std::cout << "\n--- BitSequence ---" << std::endl;
-    for (int index = 0; index < bit_sequence_count; index++) {
-        std::cout << "[" << index << "] ";
-        utils::print_bit_sequence(bit_sequences[index]);
     }
 }
 
@@ -329,68 +266,6 @@ void menu_stats() {
     }
 }
 
-void menu_bit_operations() {
-    std::cout << "\n=== BitSequence Operations ===" << std::endl;
-    std::cout << "1. AND" << std::endl;
-    std::cout << "2. OR" << std::endl;
-    std::cout << "3. XOR" << std::endl;
-    std::cout << "4. NOT" << std::endl;
-    std::cout << "Choice: ";
-
-    int choice = 0;
-    utils::read_int(choice);
-
-    if (choice == 4) {
-        const int index = select_bit_sequence("Select BitSequence:");
-        if (index == -1) {
-            return;
-        }
-
-        BitSequence *result = ~(*bit_sequences[index]);
-        std::cout << "Result: ";
-        utils::print_bit_sequence(result);
-
-        if (!store_bit_sequence(result)) {
-            delete result;
-            std::cout << "No free slots to store result" << std::endl;
-            return;
-        }
-        std::cout << "Stored as bit sequence " << (bit_sequence_count - 1) << std::endl;
-        return;
-    }
-
-    const int left = select_bit_sequence("Select first BitSequence:");
-    if (left == -1) {
-        return;
-    }
-    const int right = select_bit_sequence("Select second BitSequence:");
-    if (right == -1) {
-        return;
-    }
-
-    BitSequence *result = nullptr;
-    if (choice == 1) {
-        result = *bit_sequences[left] & *bit_sequences[right];
-    } else if (choice == 2) {
-        result = *bit_sequences[left] | *bit_sequences[right];
-    } else if (choice == 3) {
-        result = *bit_sequences[left] ^ *bit_sequences[right];
-    } else {
-        std::cout << "Invalid choice" << std::endl;
-        return;
-    }
-
-    std::cout << "Result: ";
-    utils::print_bit_sequence(result);
-
-    if (!store_bit_sequence(result)) {
-        delete result;
-        std::cout << "No free slots to store result" << std::endl;
-        return;
-    }
-    std::cout << "Stored as bit sequence " << (bit_sequence_count - 1) << std::endl;
-}
-
 void menu_split() {
     const int index = select_sequence("Select sequence to split by zero:");
     if (index == -1) {
@@ -451,32 +326,6 @@ void menu_slice() {
     delete replacement;
 }
 
-void menu_apply_mask() {
-    const int mask_index = select_bit_sequence("Select mask BitSequence:");
-    if (mask_index == -1) {
-        return;
-    }
-    const int sequence_index = select_sequence("Select sequence to filter:");
-    if (sequence_index == -1) {
-        return;
-    }
-
-    try {
-        Sequence<int> *result = bit_sequences[mask_index]->apply_mask(sequences[sequence_index]);
-        std::cout << "Result: ";
-        utils::print_sequence(result);
-
-        if (!store_sequence(result)) {
-            delete result;
-            std::cout << "No free slots to store result" << std::endl;
-            return;
-        }
-        std::cout << "Stored as sequence " << (sequence_count - 1) << std::endl;
-    } catch (const std::invalid_argument &e) {
-        std::cout << "Error: " << e.what() << std::endl;
-    }
-}
-
 void menu_run_tests() {
     std::cout << "\nRunning tests..." << std::endl;
     const int status = std::system("make tests && ./tests_runner");
@@ -489,10 +338,6 @@ void destroy_all() {
     for (int index = 0; index < sequence_count; index++) {
         delete sequences[index];
         sequences[index] = nullptr;
-    }
-    for (int index = 0; index < bit_sequence_count; index++) {
-        delete bit_sequences[index];
-        bit_sequences[index] = nullptr;
     }
 }
 
@@ -509,12 +354,10 @@ void run_menu() {
         std::cout << "7. Map (square)" << std::endl;
         std::cout << "8. Where (positive)" << std::endl;
         std::cout << "9. Reduce (sum)" << std::endl;
-        std::cout << "10. Bit operations" << std::endl;
-        std::cout << "11. Split by zero" << std::endl;
-        std::cout << "12. Slice" << std::endl;
-        std::cout << "13. Stats" << std::endl;
-        std::cout << "14. Apply mask" << std::endl;
-        std::cout << "15. Run tests" << std::endl;
+        std::cout << "10. Split by zero" << std::endl;
+        std::cout << "11. Slice" << std::endl;
+        std::cout << "12. Stats" << std::endl;
+        std::cout << "13. Run tests" << std::endl;
         std::cout << "0. Exit" << std::endl;
         std::cout << "Choice: ";
         utils::read_int(choice);
@@ -548,21 +391,15 @@ void run_menu() {
             menu_reduce();
             break;
         case 10:
-            menu_bit_operations();
-            break;
-        case 11:
             menu_split();
             break;
-        case 12:
+        case 11:
             menu_slice();
             break;
-        case 13:
+        case 12:
             menu_stats();
             break;
-        case 14:
-            menu_apply_mask();
-            break;
-        case 15:
+        case 13:
             menu_run_tests();
             break;
         case 0:

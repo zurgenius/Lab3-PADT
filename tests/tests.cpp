@@ -1,6 +1,5 @@
 #include "algorithms.h"
 #include "array_sequence.h"
-#include "bit_sequence.h"
 #include "list_sequence.h"
 #include "utils.h"
 
@@ -160,68 +159,6 @@ TEST(SequenceTest, SliceReplacesRequestedRange) {
     delete sliced;
 }
 
-TEST(BitTest, ImplementsBitwiseOperators) {
-    Bit one(1);
-    Bit zero(0);
-
-    EXPECT_EQ((one & zero).get(), false);
-    EXPECT_EQ((one | zero).get(), true);
-    EXPECT_EQ((one ^ zero).get(), true);
-    EXPECT_EQ((~one).get(), false);
-}
-
-TEST(BitSequenceTest, SupportsSequenceInterface) {
-    Bit items[] = {Bit(1), Bit(0), Bit(1)};
-    BitSequence sequence(items, 3);
-
-    EXPECT_EQ(sequence.get_count(), 3);
-    EXPECT_EQ(sequence[0], Bit(1));
-    EXPECT_EQ(sequence.get_last(), Bit(1));
-}
-
-TEST(BitSequenceTest, SupportsBitwiseOperations) {
-    Bit first_items[] = {Bit(1), Bit(0), Bit(1)};
-    Bit second_items[] = {Bit(1), Bit(1), Bit(0)};
-    BitSequence first(first_items, 3);
-    BitSequence second(second_items, 3);
-
-    BitSequence *and_result = first & second;
-    BitSequence *xor_result = first ^ second;
-    BitSequence *not_result = ~first;
-
-    EXPECT_EQ(and_result->get(0), Bit(1));
-    EXPECT_EQ(and_result->get(1), Bit(0));
-    EXPECT_EQ(xor_result->get(1), Bit(1));
-    EXPECT_EQ(not_result->get(0), Bit(0));
-
-    delete and_result;
-    delete xor_result;
-    delete not_result;
-}
-
-TEST(BitSequenceTest, AppliesMaskToSequence) {
-    Bit mask_items[] = {Bit(1), Bit(0), Bit(1), Bit(0)};
-    int values[] = {10, 20, 30, 40};
-    BitSequence mask(mask_items, 4);
-    MutableArraySequence<int> sequence(values, 4);
-
-    Sequence<int> *filtered = mask.apply_mask(&sequence);
-    EXPECT_EQ(filtered->get_count(), 2);
-    EXPECT_EQ(filtered->get(0), 10);
-    EXPECT_EQ(filtered->get(1), 30);
-
-    delete filtered;
-}
-
-TEST(BitSequenceTest, RejectsMaskWithWrongLength) {
-    Bit mask_items[] = {Bit(1), Bit(0)};
-    int values[] = {1, 2, 3};
-    BitSequence mask(mask_items, 2);
-    MutableArraySequence<int> sequence(values, 3);
-
-    EXPECT_THROW(mask.apply_mask(&sequence), std::invalid_argument);
-}
-
 TEST(AlgorithmsTest, SplitProducesChunksBetweenDelimiters) {
     int items[] = {1, 2, 0, 3, 0, 4};
     MutableArraySequence<int> sequence(items, 6);
@@ -231,21 +168,6 @@ TEST(AlgorithmsTest, SplitProducesChunksBetweenDelimiters) {
     EXPECT_EQ(groups->get(0)->get_count(), 2);
     EXPECT_EQ(groups->get(1)->get_count(), 1);
     EXPECT_EQ(groups->get(2)->get(0), 4);
-
-    for (int index = 0; index < groups->get_count(); index++) {
-        delete groups->get(index);
-    }
-    delete groups;
-}
-
-TEST(AlgorithmsTest, SplitWorksForBitSequenceToo) {
-    Bit bits[] = {Bit(1), Bit(0), Bit(1), Bit(1)};
-    BitSequence sequence(bits, 4);
-
-    Sequence<Sequence<Bit> *> *groups = split(&sequence, utils::is_zero_bit);
-    EXPECT_EQ(groups->get_count(), 2);
-    EXPECT_EQ(groups->get(0)->get_count(), 1);
-    EXPECT_EQ(groups->get(1)->get_count(), 2);
 
     for (int index = 0; index < groups->get_count(); index++) {
         delete groups->get(index);

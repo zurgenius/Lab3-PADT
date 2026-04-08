@@ -23,7 +23,6 @@
 - `LinkedList`
 - `Sequence`, `ArraySequence`, `ListSequence`
 - mutable / immutable варианты последовательностей
-- `Bit` и `BitSequence`
 - `Option<T>`
 - итераторы
 - `split`, `slice`, `min_max_avg`
