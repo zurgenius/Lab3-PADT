@@ -27,6 +27,7 @@ target_compile_options(lab2_warnings INTERFACE ${LAB2_WARNING_FLAGS})
 
 add_library(lab2_core STATIC
     src/bit_sequence.cpp
+    src/utils.cpp
 )
 target_include_directories(lab2_core PUBLIC include)
 target_link_libraries(lab2_core PUBLIC lab2_warnings)

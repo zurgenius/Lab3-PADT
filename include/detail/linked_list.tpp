@@ -25,6 +25,31 @@ LinkedList<T>::LinkedList(const LinkedList<T> &other) : head(nullptr), tail(null
     }
 }
 
+template <class T> LinkedList<T> &LinkedList<T>::operator=(const LinkedList<T> &other) {
+    if (this == &other) {
+        return *this;
+    }
+
+    Node *current = head;
+    while (current != nullptr) {
+        Node *tmp = current;
+        current = current->next;
+        delete tmp;
+    }
+
+    head = nullptr;
+    tail = nullptr;
+    length = 0;
+
+    Node *other_current = other.head;
+    while (other_current != nullptr) {
+        append(other_current->data);
+        other_current = other_current->next;
+    }
+
+    return *this;
+}
+
 template <class T> const T &LinkedList<T>::get_first() const {
     if (head == nullptr) {
         throw std::out_of_range("Index out of range");
@@ -117,21 +142,6 @@ template <class T> void LinkedList<T>::insert_at(const T &item, int index) {
     Node *node = new Node{item, previous->next};
     previous->next = node;
     length++;
-}
-
-template <class T> LinkedList<T> *LinkedList<T>::concat(const LinkedList<T> *other) {
-    if (other == nullptr) {
-        throw std::invalid_argument("Cannot concat with nullptr");
-    }
-
-    LinkedList<T> *result = new LinkedList<T>();
-    for (Node *current = head; current != nullptr; current = current->next) {
-        result->append(current->data);
-    }
-    for (Node *current = other->head; current != nullptr; current = current->next) {
-        result->append(current->data);
-    }
-    return result;
 }
 
 template <class T> LinkedList<T>::~LinkedList() {

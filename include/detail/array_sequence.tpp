@@ -170,3 +170,46 @@ T ArraySequence<T>::reduce(T (*func)(const T &first_elem, const T &second_elem),
     }
     return accumulated;
 }
+
+template <class T>
+Sequence<T> *ArraySequence<T>::slice(int index, int count, const Sequence<T> *replace_seq) {
+    const int length = this->count;
+    if (count < 0) {
+        throw std::invalid_argument("Slice count cannot be negative");
+    }
+    if (length == 0) {
+        throw std::out_of_range("Slice index out of range");
+    }
+
+    if (index < 0) {
+        index += length;
+    }
+    if (index < 0 || index >= length) {
+        throw std::out_of_range("Slice index out of range");
+    }
+
+    const int removed = (count > length - index) ? (length - index) : count;
+    const int replacement_count = (replace_seq == nullptr) ? 0 : replace_seq->get_count();
+    const int result_count = index + replacement_count + (length - index - removed);
+
+    ArraySequence<T> *result = EmptyClone();
+    result->array.resize(result_count);
+    result->count = result_count;
+
+    int write_index = 0;
+    for (int current = 0; current < index; current++) {
+        result->array.set(write_index++, array.get(current));
+    }
+
+    if (replace_seq != nullptr) {
+        for (int current = 0; current < replacement_count; current++) {
+            result->array.set(write_index++, replace_seq->get(current));
+        }
+    }
+
+    for (int current = index + removed; current < length; current++) {
+        result->array.set(write_index++, array.get(current));
+    }
+
+    return result;
+}

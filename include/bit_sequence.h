@@ -43,6 +43,7 @@ class BitSequence : public Sequence<Bit> {
     Sequence<Bit> *where(bool (*predicate)(const Bit &elem)) override;
     Bit reduce(Bit (*func)(const Bit &first_elem, const Bit &second_elem),
                const Bit &initial_elem) override;
+    Sequence<Bit> *slice(int index, int count, const Sequence<Bit> *replace_seq = nullptr) override;
 
     BitSequence *bit_and(const BitSequence &other) const;
     BitSequence *bit_or(const BitSequence &other) const;
@@ -78,8 +79,6 @@ class BitSequence : public Sequence<Bit> {
             current = Bit(bit_seq->get_bit(index));
             return current;
         }
-
-        void reset() override { index = -1; }
     };
 
     IEnumerator<Bit> *get_enumerator() const override { return new Enumerator(this); }

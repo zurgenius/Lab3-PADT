@@ -2,22 +2,9 @@
 #include "array_sequence.h"
 #include "bit_sequence.h"
 #include "list_sequence.h"
+#include "utils.h"
 
 #include <gtest/gtest.h>
-
-namespace {
-
-int square(const int &value) { return value * value; }
-
-bool is_even(const int &value) { return value % 2 == 0; }
-
-int sum(const int &left, const int &right) { return left + right; }
-
-bool is_zero(const int &value) { return value == 0; }
-
-bool is_zero_bit(const Bit &bit) { return !bit.get(); }
-
-} // namespace
 
 TEST(DynamicArrayTest, SupportsResizeAndIndexedAccess) {
     DynamicArray<int> array(2);
@@ -116,9 +103,9 @@ TEST(MutableListSequenceTest, SupportsMapWhereReduce) {
     int items[] = {1, 2, 3, 4};
     MutableListSequence<int> sequence(items, 4);
 
-    Sequence<int> *mapped = sequence.map(square);
-    Sequence<int> *filtered = sequence.where(is_even);
-    int reduced = sequence.reduce(sum, 0);
+    Sequence<int> *mapped = sequence.map(utils::square);
+    Sequence<int> *filtered = sequence.where(utils::is_even);
+    int reduced = sequence.reduce(utils::sum, 0);
 
     EXPECT_EQ(mapped->get(2), 9);
     EXPECT_EQ(filtered->get_count(), 2);
@@ -239,7 +226,7 @@ TEST(AlgorithmsTest, SplitProducesChunksBetweenDelimiters) {
     int items[] = {1, 2, 0, 3, 0, 4};
     MutableArraySequence<int> sequence(items, 6);
 
-    Sequence<Sequence<int> *> *groups = split(&sequence, is_zero);
+    Sequence<Sequence<int> *> *groups = split(&sequence, utils::is_zero);
     EXPECT_EQ(groups->get_count(), 3);
     EXPECT_EQ(groups->get(0)->get_count(), 2);
     EXPECT_EQ(groups->get(1)->get_count(), 1);
@@ -255,7 +242,7 @@ TEST(AlgorithmsTest, SplitWorksForBitSequenceToo) {
     Bit bits[] = {Bit(1), Bit(0), Bit(1), Bit(1)};
     BitSequence sequence(bits, 4);
 
-    Sequence<Sequence<Bit> *> *groups = split(&sequence, is_zero_bit);
+    Sequence<Sequence<Bit> *> *groups = split(&sequence, utils::is_zero_bit);
     EXPECT_EQ(groups->get_count(), 2);
     EXPECT_EQ(groups->get(0)->get_count(), 1);
     EXPECT_EQ(groups->get(1)->get_count(), 2);

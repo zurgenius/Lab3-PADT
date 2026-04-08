@@ -51,11 +51,13 @@ template <class T> Sequence<T> *ListSequence<T>::get_sub_sequence(int start, int
         throw std::out_of_range("Index out of range");
     }
 
-    ListSequence<T> *result = EmptyClone();
-    for (int index = start; index <= end; index++) {
-        result->list.append(list.get(index));
-    }
-    return result;
+    ListSequence<T> *sub_list = EmptyClone();
+    LinkedList<T> *sub_list_inside = list.get_sub_list(start, end);
+
+    sub_list->list = *sub_list_inside;
+    delete sub_list_inside;
+
+    return sub_list;
 }
 
 template <class T> Sequence<T> *ListSequence<T>::append(const T &item) {
@@ -81,14 +83,21 @@ template <class T> Sequence<T> *ListSequence<T>::concat(const Sequence<T> *other
         throw std::invalid_argument("Cannot concat with nullptr");
     }
 
-    ListSequence<T> *result = EmptyClone();
-    for (int index = 0; index < get_count(); index++) {
-        result->list.append(list.get(index));
+    ListSequence<T> *concat_list = EmptyClone();
+
+    IEnumerator<T> *this_iter = this->get_enumerator();
+    while (this_iter->move_next()) {
+        concat_list->list.append(this_iter->get_current());
     }
-    for (int index = 0; index < other->get_count(); index++) {
-        result->list.append(other->get(index));
+    delete this_iter;
+
+    IEnumerator<T> *other_iter = other->get_enumerator();
+    while (other_iter->move_next()) {
+        concat_list->list.append(other_iter->get_current());
     }
-    return result;
+    delete other_iter;
+
+    return concat_list;
 }
 
 template <class T> Sequence<T> *ListSequence<T>::map(T (*func)(const T &elem)) {
@@ -124,4 +133,43 @@ T ListSequence<T>::reduce(T (*func)(const T &first_elem, const T &second_elem),
     }
     delete iterator;
     return accumulated;
+}
+
+template <class T>
+Sequence<T> *ListSequence<T>::slice(int index, int count, const Sequence<T> *replace_seq) {
+    const int length = get_count();
+    if (count < 0) {
+        throw std::invalid_argument("Slice count cannot be negative");
+    }
+    if (length == 0) {
+        throw std::out_of_range("Slice index out of range");
+    }
+
+    if (index < 0) {
+        index += length;
+    }
+    if (index < 0 || index >= length) {
+        throw std::out_of_range("Slice index out of range");
+    }
+
+    const int removed = (count > length - index) ? (length - index) : count;
+    ListSequence<T> *result = EmptyClone();
+
+    if (index > 0) {
+        LinkedList<T> *prefix = list.get_sub_list(0, index - 1);
+        result->list = *prefix;
+        delete prefix;
+    }
+
+    if (replace_seq != nullptr) {
+        for (int current = 0; current < replace_seq->get_count(); current++) {
+            result->list.append(replace_seq->get(current));
+        }
+    }
+
+    for (int current = index + removed; current < length; current++) {
+        result->list.append(list.get(current));
+    }
+
+    return result;
 }

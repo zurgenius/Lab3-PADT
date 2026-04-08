@@ -28,7 +28,7 @@ template <class T> class Sequence {
     virtual T reduce(T (*func)(const T &first_elem, const T &second_elem),
                      const T &initial_elem) = 0;
 
-    virtual Sequence<T> *slice(int index, int count, const Sequence<T> *replace_seq = nullptr);
+    virtual Sequence<T> *slice(int index, int count, const Sequence<T> *replace_seq = nullptr) = 0;
 
     virtual IEnumerator<T> *get_enumerator() const = 0;
 

@@ -2,8 +2,6 @@
 
 #include <stdexcept>
 
-namespace {
-
 void zero_bytes(DynamicArray<unsigned char> &bytes) {
     for (int index = 0; index < bytes.get_size(); index++) {
         bytes.set(index, 0);
@@ -29,8 +27,6 @@ bool get_packed_bit(const DynamicArray<unsigned char> &bytes, int index) {
     const unsigned char byte = bytes.get(index / 8);
     return ((byte >> (index % 8)) & 1u) != 0;
 }
-
-} // namespace
 
 int BitSequence::check_bytes_needed(int n) { return (n <= 0) ? 0 : (n + 7) / 8; }
 
@@ -239,6 +235,42 @@ Bit BitSequence::reduce(Bit (*func)(const Bit &first_elem, const Bit &second_ele
         accumulated = func(accumulated, Bit(get_bit(index)));
     }
     return accumulated;
+}
+
+Sequence<Bit> *BitSequence::slice(int index, int count, const Sequence<Bit> *replace_seq) {
+    const int length = get_count();
+    if (count < 0) {
+        throw std::invalid_argument("Slice count cannot be negative");
+    }
+    if (length == 0) {
+        throw std::out_of_range("Slice index out of range");
+    }
+
+    if (index < 0) {
+        index += length;
+    }
+    if (index < 0 || index >= length) {
+        throw std::out_of_range("Slice index out of range");
+    }
+
+    const int removed = (count > length - index) ? (length - index) : count;
+    BitSequence *result = new BitSequence();
+
+    for (int current = 0; current < index; current++) {
+        result->append(get(current));
+    }
+
+    if (replace_seq != nullptr) {
+        for (int current = 0; current < replace_seq->get_count(); current++) {
+            result->append(replace_seq->get(current));
+        }
+    }
+
+    for (int current = index + removed; current < length; current++) {
+        result->append(get(current));
+    }
+
+    return result;
 }
 
 BitSequence *BitSequence::bit_and(const BitSequence &other) const {

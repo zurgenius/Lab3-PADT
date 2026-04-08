@@ -4,13 +4,11 @@
 #include "array_sequence.h"
 #include "bit_sequence.h"
 #include "list_sequence.h"
+#include "utils.h"
 
 #include <cstdlib>
 #include <iostream>
 #include <stdexcept>
-#include <string>
-
-namespace {
 
 const int kMaxSequences = 10;
 
@@ -19,52 +17,6 @@ int sequence_count = 0;
 
 BitSequence *bit_sequences[kMaxSequences];
 int bit_sequence_count = 0;
-
-int square(const int &value) { return value * value; }
-
-bool is_positive(const int &value) { return value > 0; }
-
-int sum(const int &left, const int &right) { return left + right; }
-
-bool is_zero(const int &value) { return value == 0; }
-
-void read_int(int &value) {
-    std::string line;
-    while (true) {
-        std::getline(std::cin, line);
-        try {
-            std::size_t parsed = 0;
-            value = std::stoi(line, &parsed);
-            if (parsed == line.size()) {
-                return;
-            }
-        } catch (...) {
-        }
-        std::cout << "Incorrect input. Try again: ";
-    }
-}
-
-void print_sequence(const Sequence<int> *sequence) {
-    std::cout << "[";
-    for (int index = 0; index < sequence->get_count(); index++) {
-        if (index != 0) {
-            std::cout << ", ";
-        }
-        std::cout << sequence->get(index);
-    }
-    std::cout << "]" << std::endl;
-}
-
-void print_bit_sequence(const BitSequence *sequence) {
-    std::cout << "[";
-    for (int index = 0; index < sequence->get_count(); index++) {
-        if (index != 0) {
-            std::cout << ", ";
-        }
-        std::cout << sequence->get(index).get();
-    }
-    std::cout << "]" << std::endl;
-}
 
 bool store_sequence(Sequence<int> *sequence) {
     if (sequence_count >= kMaxSequences) {
@@ -98,12 +50,12 @@ int select_sequence(const char *prompt) {
     std::cout << prompt << std::endl;
     for (int index = 0; index < sequence_count; index++) {
         std::cout << index << ": ";
-        print_sequence(sequences[index]);
+        utils::print_sequence(sequences[index]);
     }
 
     std::cout << "Index: ";
     int index = -1;
-    read_int(index);
+    utils::read_int(index);
     if (index < 0 || index >= sequence_count) {
         std::cout << "Invalid index" << std::endl;
         return -1;
@@ -120,12 +72,12 @@ int select_bit_sequence(const char *prompt) {
     std::cout << prompt << std::endl;
     for (int index = 0; index < bit_sequence_count; index++) {
         std::cout << index << ": ";
-        print_bit_sequence(bit_sequences[index]);
+        utils::print_bit_sequence(bit_sequences[index]);
     }
 
     std::cout << "Index: ";
     int index = -1;
-    read_int(index);
+    utils::read_int(index);
     if (index < 0 || index >= bit_sequence_count) {
         std::cout << "Invalid index" << std::endl;
         return -1;
@@ -158,18 +110,18 @@ void menu_create_sequence() {
     std::cout << "Choice: ";
 
     int choice = 0;
-    read_int(choice);
+    utils::read_int(choice);
 
     if (choice == 5) {
         std::cout << "Enter number of bits: ";
         int count = 0;
-        read_int(count);
+        utils::read_int(count);
 
         BitSequence *sequence = new BitSequence();
         for (int index = 0; index < count; index++) {
             std::cout << "Bit " << index << " (0/1): ";
             int value = 0;
-            read_int(value);
+            utils::read_int(value);
             sequence->append(Bit(value));
         }
 
@@ -190,12 +142,12 @@ void menu_create_sequence() {
 
     std::cout << "Enter number of elements: ";
     int count = 0;
-    read_int(count);
+    utils::read_int(count);
 
     for (int index = 0; index < count; index++) {
         std::cout << "Element " << index << ": ";
         int value = 0;
-        read_int(value);
+        utils::read_int(value);
         Sequence<int> *result = sequence->append(value);
         replace_if_new(sequence, result);
     }
@@ -216,7 +168,7 @@ void menu_add_element() {
 
     std::cout << "Enter element: ";
     int value = 0;
-    read_int(value);
+    utils::read_int(value);
 
     Sequence<int> *result = sequences[index]->append(value);
     replace_if_new(sequences[index], result);
@@ -232,13 +184,13 @@ void menu_print_all() {
     std::cout << "\n--- Sequence<int> ---" << std::endl;
     for (int index = 0; index < sequence_count; index++) {
         std::cout << "[" << index << "] ";
-        print_sequence(sequences[index]);
+        utils::print_sequence(sequences[index]);
     }
 
     std::cout << "\n--- BitSequence ---" << std::endl;
     for (int index = 0; index < bit_sequence_count; index++) {
         std::cout << "[" << index << "] ";
-        print_bit_sequence(bit_sequences[index]);
+        utils::print_bit_sequence(bit_sequences[index]);
     }
 }
 
@@ -250,7 +202,7 @@ void menu_get_element() {
 
     std::cout << "Enter element index: ";
     int item_index = 0;
-    read_int(item_index);
+    utils::read_int(item_index);
 
     try {
         std::cout << "Element: " << (*sequences[sequence_index])[item_index] << std::endl;
@@ -267,15 +219,15 @@ void menu_get_subsequence() {
 
     std::cout << "Start index: ";
     int start = 0;
-    read_int(start);
+    utils::read_int(start);
     std::cout << "End index: ";
     int end = 0;
-    read_int(end);
+    utils::read_int(end);
 
     try {
         Sequence<int> *result = sequences[index]->get_sub_sequence(start, end);
         std::cout << "Result: ";
-        print_sequence(result);
+        utils::print_sequence(result);
 
         if (!store_sequence(result)) {
             delete result;
@@ -300,7 +252,7 @@ void menu_concat() {
 
     Sequence<int> *result = sequences[left]->concat(sequences[right]);
     std::cout << "Result: ";
-    print_sequence(result);
+    utils::print_sequence(result);
 
     if (!store_sequence(result)) {
         delete result;
@@ -316,9 +268,9 @@ void menu_map() {
         return;
     }
 
-    Sequence<int> *result = sequences[index]->map(square);
+    Sequence<int> *result = sequences[index]->map(utils::square);
     std::cout << "Mapped sequence: ";
-    print_sequence(result);
+    utils::print_sequence(result);
 
     if (result == sequences[index]) {
         std::cout << "Sequence updated in place" << std::endl;
@@ -338,9 +290,9 @@ void menu_where() {
         return;
     }
 
-    Sequence<int> *result = sequences[index]->where(is_positive);
+    Sequence<int> *result = sequences[index]->where(utils::is_positive);
     std::cout << "Filtered sequence: ";
-    print_sequence(result);
+    utils::print_sequence(result);
 
     if (result == sequences[index]) {
         std::cout << "Sequence updated in place" << std::endl;
@@ -359,7 +311,7 @@ void menu_reduce() {
     if (index == -1) {
         return;
     }
-    std::cout << "Reduce(sum): " << sequences[index]->reduce(sum, 0) << std::endl;
+    std::cout << "Reduce(sum): " << sequences[index]->reduce(utils::sum, 0) << std::endl;
 }
 
 void menu_stats() {
@@ -386,7 +338,7 @@ void menu_bit_operations() {
     std::cout << "Choice: ";
 
     int choice = 0;
-    read_int(choice);
+    utils::read_int(choice);
 
     if (choice == 4) {
         const int index = select_bit_sequence("Select BitSequence:");
@@ -396,7 +348,7 @@ void menu_bit_operations() {
 
         BitSequence *result = ~(*bit_sequences[index]);
         std::cout << "Result: ";
-        print_bit_sequence(result);
+        utils::print_bit_sequence(result);
 
         if (!store_bit_sequence(result)) {
             delete result;
@@ -429,7 +381,7 @@ void menu_bit_operations() {
     }
 
     std::cout << "Result: ";
-    print_bit_sequence(result);
+    utils::print_bit_sequence(result);
 
     if (!store_bit_sequence(result)) {
         delete result;
@@ -445,10 +397,10 @@ void menu_split() {
         return;
     }
 
-    Sequence<Sequence<int> *> *groups = split(sequences[index], is_zero);
+    Sequence<Sequence<int> *> *groups = split(sequences[index], utils::is_zero);
     for (int group = 0; group < groups->get_count(); group++) {
         std::cout << "Group " << group << ": ";
-        print_sequence(groups->get(group));
+        utils::print_sequence(groups->get(group));
         delete groups->get(group);
     }
     delete groups;
@@ -462,13 +414,13 @@ void menu_slice() {
 
     std::cout << "Start index: ";
     int start = 0;
-    read_int(start);
+    utils::read_int(start);
     std::cout << "Delete count: ";
     int count = 0;
-    read_int(count);
+    utils::read_int(count);
     std::cout << "Replacement size: ";
     int replacement_size = 0;
-    read_int(replacement_size);
+    utils::read_int(replacement_size);
 
     Sequence<int> *replacement = nullptr;
     if (replacement_size > 0) {
@@ -476,7 +428,7 @@ void menu_slice() {
         for (int item = 0; item < replacement_size; item++) {
             std::cout << "Replacement element " << item << ": ";
             int value = 0;
-            read_int(value);
+            utils::read_int(value);
             replacement->append(value);
         }
     }
@@ -484,7 +436,7 @@ void menu_slice() {
     try {
         Sequence<int> *result = sequences[index]->slice(start, count, replacement);
         std::cout << "Result: ";
-        print_sequence(result);
+        utils::print_sequence(result);
 
         if (!store_sequence(result)) {
             delete result;
@@ -512,7 +464,7 @@ void menu_apply_mask() {
     try {
         Sequence<int> *result = bit_sequences[mask_index]->apply_mask(sequences[sequence_index]);
         std::cout << "Result: ";
-        print_sequence(result);
+        utils::print_sequence(result);
 
         if (!store_sequence(result)) {
             delete result;
@@ -544,8 +496,6 @@ void destroy_all() {
     }
 }
 
-} // namespace
-
 void run_menu() {
     int choice = -1;
     while (choice != 0) {
@@ -567,7 +517,7 @@ void run_menu() {
         std::cout << "15. Run tests" << std::endl;
         std::cout << "0. Exit" << std::endl;
         std::cout << "Choice: ";
-        read_int(choice);
+        utils::read_int(choice);
 
         switch (choice) {
         case 1:

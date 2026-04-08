@@ -38,8 +38,6 @@ template <class T> class DynamicArray {
         }
 
         const T &get_current() const override { return data[index]; }
-
-        void reset() override { index = -1; }
     };
 
     IEnumerator<T> *get_enumerator() const { return new Enumerator(data, size); }

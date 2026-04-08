@@ -17,6 +17,7 @@ template <class T> class LinkedList {
     LinkedList();
     LinkedList(const T *items, int count);
     LinkedList(const LinkedList<T> &other);
+    LinkedList<T> &operator=(const LinkedList<T> &other);
 
     const T &get_first() const;
     const T &get_last() const;
@@ -29,8 +30,6 @@ template <class T> class LinkedList {
     void append(const T &item);
     void prepend(const T &item);
     void insert_at(const T &item, int index);
-
-    LinkedList<T> *concat(const LinkedList<T> *other);
 
     ~LinkedList();
 
@@ -52,8 +51,6 @@ template <class T> class LinkedList {
         }
 
         const T &get_current() const override { return current->data; }
-
-        void reset() override { current = nullptr; }
     };
 
     IEnumerator<T> *get_enumerator() const { return new Enumerator(head); }
