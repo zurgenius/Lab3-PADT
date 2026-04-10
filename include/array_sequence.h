@@ -7,15 +7,16 @@ template <class T> class ArraySequence : public Sequence<T> {
   protected:
     DynamicArray<T> array;
     int count;
+    int capacity;
+    virtual ArraySequence<T> *Instance() = 0;
+    virtual ArraySequence<T> *EmptyClone() = 0;
+    void reallocate_if_needed(int required);
 
   public:
     ArraySequence();
     ArraySequence(const T *items, int count);
     ArraySequence(const DynamicArray<T> &other);
     ArraySequence(const ArraySequence<T> &other);
-
-    virtual ArraySequence<T> *Instance() = 0;
-    virtual ArraySequence<T> *EmptyClone() = 0;
 
     const T &get_first() const override;
     const T &get_last() const override;
@@ -39,7 +40,25 @@ template <class T> class ArraySequence : public Sequence<T> {
     T reduce(T (*func)(const T &first_elem, const T &second_elem), const T &initial_elem) override;
     Sequence<T> *slice(int index, int count, const Sequence<T> *replace_seq = nullptr) override;
 
-    IEnumerator<T> *get_enumerator() const override { return array.get_enumerator(); }
+    class Enumerator : public IEnumerator<T> {
+      private:
+        const DynamicArray<T> &array;
+        int count;
+        int index;
+
+      public:
+        Enumerator(const DynamicArray<T> &array, int count)
+            : array(array), count(count), index(-1) {}
+
+        bool move_next() override {
+            index++;
+            return index < count;
+        }
+
+        const T &get_current() const override { return array.get(index); }
+    };
+
+    IEnumerator<T> *get_enumerator() const override { return new Enumerator(array, count); }
 
     ~ArraySequence() override {}
 };

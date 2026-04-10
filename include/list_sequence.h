@@ -6,15 +6,14 @@
 template <class T> class ListSequence : public Sequence<T> {
   protected:
     LinkedList<T> list;
+    virtual ListSequence<T> *Instance() = 0;
+    virtual ListSequence<T> *EmptyClone() = 0;
 
   public:
     ListSequence();
     ListSequence(const T *items, int count);
     ListSequence(const LinkedList<T> &other);
     ListSequence(const ListSequence<T> &other);
-
-    virtual ListSequence<T> *Instance() = 0;
-    virtual ListSequence<T> *EmptyClone() = 0;
 
     const T &get_first() const override;
     const T &get_last() const override;

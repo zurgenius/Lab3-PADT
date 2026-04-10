@@ -2,18 +2,33 @@
 
 #include <stdexcept>
 
-template <class T> ArraySequence<T>::ArraySequence() : array(0), count(0) {}
+template <class T> void ArraySequence<T>::reallocate_if_needed(int required) {
+    if (required <= capacity) {
+        return;
+    }
+
+    int new_capacity = (capacity == 0) ? 1 : capacity;
+    while (new_capacity < required) {
+        new_capacity *= 2;
+    }
+
+    array.resize(new_capacity);
+    capacity = new_capacity;
+}
+
+template <class T> ArraySequence<T>::ArraySequence() : array(0), count(0), capacity(0) {}
 
 template <class T>
-ArraySequence<T>::ArraySequence(const T *items, int count) : array(items, count), count(count) {}
+ArraySequence<T>::ArraySequence(const T *items, int count)
+    : array(items, count), count(count), capacity(count) {}
 
 template <class T>
 ArraySequence<T>::ArraySequence(const DynamicArray<T> &other)
-    : array(other), count(other.get_size()) {}
+    : array(other), count(other.get_size()), capacity(other.get_size()) {}
 
 template <class T>
 ArraySequence<T>::ArraySequence(const ArraySequence<T> &other)
-    : array(other.array), count(other.count) {}
+    : array(other.array), count(other.count), capacity(other.capacity) {}
 
 template <class T> const T &ArraySequence<T>::get_first() const {
     if (count == 0) {
@@ -59,6 +74,7 @@ template <class T> Sequence<T> *ArraySequence<T>::get_sub_sequence(int start, in
     ArraySequence<T> *result = EmptyClone();
     result->array.resize(length);
     result->count = length;
+    result->capacity = length;
 
     for (int offset = 0; offset < length; offset++) {
         result->array.set(offset, array.get(start + offset));
@@ -71,7 +87,7 @@ template <class T> Sequence<T> *ArraySequence<T>::append(const T &item) {
     ArraySequence<T> *target = Instance();
     const int old_count = target->count;
 
-    target->array.resize(old_count + 1);
+    target->reallocate_if_needed(old_count + 1);
     target->array.set(old_count, item);
     target->count = old_count + 1;
     return target;
@@ -81,7 +97,7 @@ template <class T> Sequence<T> *ArraySequence<T>::prepend(const T &item) {
     ArraySequence<T> *target = Instance();
     const int old_count = target->count;
 
-    target->array.resize(old_count + 1);
+    target->reallocate_if_needed(old_count + 1);
     for (int index = old_count; index > 0; index--) {
         target->array.set(index, target->array.get(index - 1));
     }
@@ -97,7 +113,7 @@ template <class T> Sequence<T> *ArraySequence<T>::insert_at(const T &item, int i
     }
 
     const int old_count = target->count;
-    target->array.resize(old_count + 1);
+    target->reallocate_if_needed(old_count + 1);
     for (int current = old_count; current > index; current--) {
         target->array.set(current, target->array.get(current - 1));
     }
@@ -114,6 +130,7 @@ template <class T> Sequence<T> *ArraySequence<T>::concat(const Sequence<T> *othe
     ArraySequence<T> *result = EmptyClone();
     result->count = count + other->get_count();
     result->array.resize(result->count);
+    result->capacity = result->count;
 
     int write_index = 0;
     for (int index = 0; index < count; index++) {
@@ -130,6 +147,7 @@ template <class T> Sequence<T> *ArraySequence<T>::map(T (*func)(const T &elem)) 
     ArraySequence<T> *result = EmptyClone();
     result->count = count;
     result->array.resize(count);
+    result->capacity = count;
 
     for (int index = 0; index < count; index++) {
         result->array.set(index, func(array.get(index)));
@@ -149,6 +167,7 @@ template <class T> Sequence<T> *ArraySequence<T>::where(bool (*predicate)(const 
     ArraySequence<T> *result = EmptyClone();
     result->count = matches;
     result->array.resize(matches);
+    result->capacity = matches;
 
     int write_index = 0;
     for (int index = 0; index < count; index++) {
@@ -195,6 +214,7 @@ Sequence<T> *ArraySequence<T>::slice(int index, int count, const Sequence<T> *re
     ArraySequence<T> *result = EmptyClone();
     result->array.resize(result_count);
     result->count = result_count;
+    result->capacity = result_count;
 
     int write_index = 0;
     for (int current = 0; current < index; current++) {

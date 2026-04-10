@@ -28,7 +28,18 @@ template <class T> const T &ListSequence<T>::get(int index) const {
     if (index < 0 || index >= list.get_length()) {
         throw std::out_of_range("Index out of range");
     }
-    return list.get(index);
+
+    IEnumerator<T> *iterator = list.get_enumerator();
+    for (int current = 0; iterator->move_next(); current++) {
+        if (current == index) {
+            const T *value = &iterator->get_current();
+            delete iterator;
+            return *value;
+        }
+    }
+
+    delete iterator;
+    throw std::out_of_range("Index out of range");
 }
 
 template <class T> Option<T> ListSequence<T>::try_get_first() const {
@@ -40,8 +51,21 @@ template <class T> Option<T> ListSequence<T>::try_get_last() const {
 }
 
 template <class T> Option<T> ListSequence<T>::try_get(int index) const {
-    return (index < 0 || index >= list.get_length()) ? Option<T>::None()
-                                                     : Option<T>::Some(list.get(index));
+    if (index < 0 || index >= list.get_length()) {
+        return Option<T>::None();
+    }
+
+    IEnumerator<T> *iterator = list.get_enumerator();
+    for (int current = 0; iterator->move_next(); current++) {
+        if (current == index) {
+            Option<T> result = Option<T>::Some(iterator->get_current());
+            delete iterator;
+            return result;
+        }
+    }
+
+    delete iterator;
+    return Option<T>::None();
 }
 
 template <class T> int ListSequence<T>::get_count() const { return list.get_length(); }
@@ -167,8 +191,14 @@ Sequence<T> *ListSequence<T>::slice(int index, int count, const Sequence<T> *rep
         }
     }
 
-    for (int current = index + removed; current < length; current++) {
-        result->list.append(list.get(current));
+    if (index + removed < length) {
+        LinkedList<T> *suffix = list.get_sub_list(index + removed, length - 1);
+        IEnumerator<T> *suffix_iterator = suffix->get_enumerator();
+        while (suffix_iterator->move_next()) {
+            result->list.append(suffix_iterator->get_current());
+        }
+        delete suffix_iterator;
+        delete suffix;
     }
 
     return result;

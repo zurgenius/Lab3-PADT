@@ -64,20 +64,6 @@ template <class T> const T &LinkedList<T>::get_last() const {
     return tail->data;
 }
 
-template <class T> const T &LinkedList<T>::get(int index) const {
-    if (index < 0 || index >= length) {
-        throw std::out_of_range("Index out of range");
-    }
-
-    Node *current = head;
-    for (int step = 0; step < index; step++) {
-        current = current->next;
-    }
-    return current->data;
-}
-
-template <class T> const T &LinkedList<T>::operator[](int index) const { return get(index); }
-
 template <class T> int LinkedList<T>::get_length() const { return length; }
 
 template <class T> LinkedList<T> *LinkedList<T>::get_sub_list(int start, int end) {

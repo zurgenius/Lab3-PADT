@@ -21,8 +21,6 @@ template <class T> class LinkedList {
 
     const T &get_first() const;
     const T &get_last() const;
-    const T &get(int index) const;
-    const T &operator[](int index) const;
     int get_length() const;
 
     LinkedList<T> *get_sub_list(int start, int end);
