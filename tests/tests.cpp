@@ -1,8 +1,10 @@
 #include "array_sequence.h"
+#include "cubic_spline.h"
 #include "list_sequence.h"
 #include "utils.h"
 
 #include <gtest/gtest.h>
+#include <cmath>
 
 TEST(DynamicArrayTest, DefaultConstructorCreatesEmptyArray) {
     DynamicArray<int> array;
@@ -655,4 +657,37 @@ TEST(ListSequenceTest, EnumeratorWalksThroughSequence) {
     delete iterator;
 
     EXPECT_EQ(total, 6);
+}
+
+TEST(CubicSplineTest, BuildThrowsWhenTooFewPoints) {
+    double x[] = {0.0, 1.0};
+    double f[] = {0.0, 1.0};
+    cubic_spline<double> spline;
+
+    EXPECT_THROW(spline.build(x, f, 2), std::invalid_argument);
+}
+
+TEST(CubicSplineTest, EvaluateMatchesNodesForLinearFunction) {
+    double x[] = {0.0, 1.0, 2.0, 3.0};
+    double f[] = {1.0, 3.0, 5.0, 7.0};
+    cubic_spline<double> spline;
+
+    spline.build(x, f, 4);
+
+    EXPECT_NEAR(spline.evaluate(0.0), 1.0, 1e-12);
+    EXPECT_NEAR(spline.evaluate(1.0), 3.0, 1e-12);
+    EXPECT_NEAR(spline.evaluate(2.0), 5.0, 1e-12);
+    EXPECT_NEAR(spline.evaluate(3.0), 7.0, 1e-12);
+}
+
+TEST(CubicSplineTest, EvaluateMatchesLinearFunctionBetweenNodes) {
+    double x[] = {0.0, 1.0, 2.0, 3.0};
+    double f[] = {1.0, 3.0, 5.0, 7.0};
+    cubic_spline<double> spline;
+
+    spline.build(x, f, 4);
+
+    EXPECT_NEAR(spline.evaluate(0.5), 2.0, 1e-12);
+    EXPECT_NEAR(spline.evaluate(1.5), 4.0, 1e-12);
+    EXPECT_NEAR(spline.evaluate(2.5), 6.0, 1e-12);
 }

@@ -24,6 +24,23 @@ void cubic_spline<T>::build(const T* x, const T* f, int n) {
         throw std::invalid_argument("cubic_spline::build: at least 3 points required");
     }
 
+    if (x_) {
+        delete[] x_;
+        x_ = nullptr;
+    }
+    if (f_) {
+        delete[] f_;
+        f_ = nullptr;
+    }
+    if (Coef_) {
+        delete[] Coef_[0];
+        delete[] Coef_[1];
+        delete[] Coef_[2];
+        delete[] Coef_[3];
+        delete[] Coef_;
+        Coef_ = nullptr;
+    }
+
     n_ = n;
     x_ = new T[n];
     f_ = new T[n];
@@ -32,60 +49,40 @@ void cubic_spline<T>::build(const T* x, const T* f, int n) {
         f_[i] = f[i];
     }
 
-    // Вспомогательные массивы
-    T* a     = new T[n - 1];
-    T* c     = new T[n - 1];
-    T* d     = new T[n - 1];
     T* delta = new T[n - 1];
     T* h     = new T[n - 1];
-
-    // Трёхдиагональная матрица (размер 3 x n)
-    T** TriDiagMatrix = new T*[3];
-    TriDiagMatrix[0] = new T[n];   // поддиагональ
-    TriDiagMatrix[1] = new T[n];   // главная диагональ
-    TriDiagMatrix[2] = new T[n];   // наддиагональ
-
-    T* f_vec = new T[n];           // правая часть
-    T* b     = new T[n];           // решение (вторые производные)
-
-    // Граничные величины
-    T x3 = x_[2] - x_[0];
-    T xn = x_[n - 1] - x_[n - 3];
-
-    // Заполнение шагов и предварительных разностей
     for (int i = 0; i < n - 1; ++i) {
-        a[i]     = f_[i];
-        h[i]     = x_[i + 1] - x_[i];
+        h[i] = x_[i + 1] - x_[i];
         delta[i] = (f_[i + 1] - f_[i]) / h[i];
-
-        TriDiagMatrix[0][i] = (i > 0) ? h[i] : x3;
-        f_vec[i] = (i > 0) ? T{3} * (h[i] * delta[i - 1] + h[i - 1] * delta[i])
-                           : T{0};
     }
 
-    TriDiagMatrix[1][0] = h[0];
-    TriDiagMatrix[2][0] = h[0];
+    T** TriDiagMatrix = new T*[3];
+    TriDiagMatrix[0] = new T[n];
+    TriDiagMatrix[1] = new T[n];
+    TriDiagMatrix[2] = new T[n];
+
+    T* f_vec = new T[n];
+    T* m     = new T[n];
+
+    for (int i = 0; i < n; ++i) {
+        TriDiagMatrix[0][i] = T{0};
+        TriDiagMatrix[1][i] = T{0};
+        TriDiagMatrix[2][i] = T{0};
+        f_vec[i] = T{0};
+    }
+
+    TriDiagMatrix[1][0] = T{1};
+    TriDiagMatrix[1][n - 1] = T{1};
 
     for (int i = 1; i < n - 1; ++i) {
-        TriDiagMatrix[1][i] = T{2} * (h[i] + h[i - 1]);
+        TriDiagMatrix[0][i] = h[i - 1];
+        TriDiagMatrix[1][i] = T{2} * (h[i - 1] + h[i]);
         TriDiagMatrix[2][i] = h[i];
+        f_vec[i] = T{6} * (delta[i] - delta[i - 1]);
     }
 
-    TriDiagMatrix[1][n - 1] = h[n - 2];
-    TriDiagMatrix[2][n - 1] = xn;
-    TriDiagMatrix[0][n - 1] = h[n - 2];
+    solve_tridiag(TriDiagMatrix, f_vec, m);
 
-    // Правая часть для граничных условий
-    int last = n - 1;
-    f_vec[0] = ((h[0] + T{2} * x3) * h[1] * delta[0] + h[0] * h[0] * delta[1]) / x3;
-    f_vec[last] = (h[last - 1] * h[last - 1] * delta[last - 2]
-                   + (T{2} * xn + h[last - 1]) * h[last - 2] * delta[last - 1])
-                  / xn;
-
-    // Решение системы
-    solve_tridiag(TriDiagMatrix, f_vec, b);
-
-    // Матрица коэффициентов [a, b, c, d] для каждого интервала
     Coef_ = new T*[4];
     Coef_[0] = new T[n - 1];
     Coef_[1] = new T[n - 1];
@@ -93,19 +90,12 @@ void cubic_spline<T>::build(const T* x, const T* f, int n) {
     Coef_[3] = new T[n - 1];
 
     for (int j = 0; j < n - 1; ++j) {
-        d[j] = (b[j + 1] + b[j] - T{2} * delta[j]) / (h[j] * h[j]);
-        c[j] = T{2} * (delta[j] - b[j]) / h[j] - (b[j + 1] - delta[j]) / h[j];
-
-        Coef_[0][j] = a[j];
-        Coef_[1][j] = b[j];
-        Coef_[2][j] = c[j];
-        Coef_[3][j] = d[j];
+        Coef_[0][j] = f_[j];
+        Coef_[1][j] = delta[j] - h[j] * (T{2} * m[j] + m[j + 1]) / T{6};
+        Coef_[2][j] = m[j] / T{2};
+        Coef_[3][j] = (m[j + 1] - m[j]) / (T{6} * h[j]);
     }
 
-    // Освобождение временных массивов
-    delete[] a;
-    delete[] c;
-    delete[] d;
     delete[] delta;
     delete[] h;
     delete[] TriDiagMatrix[0];
@@ -113,7 +103,7 @@ void cubic_spline<T>::build(const T* x, const T* f, int n) {
     delete[] TriDiagMatrix[2];
     delete[] TriDiagMatrix;
     delete[] f_vec;
-    delete[] b;
+    delete[] m;
 }
 
 template <Field T>

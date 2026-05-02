@@ -1,8 +1,7 @@
 #include "cubic_spline.h"
+#include "dynamic_array.h"
 #include <cmath>
-#include <vector>
 #include <numbers>
-#include <algorithm>
 #include <iostream>
 
 // Убираем GLFW_INCLUDE_NONE, чтобы GLFW сам включил нужный OpenGL заголовок
@@ -27,54 +26,43 @@ void menu_spline_viewer() {
 
     struct DataSet {
         double step;
-        std::vector<double> x_nodes;
-        std::vector<double> f_nodes;
-        std::vector<double> x_dense;
-        std::vector<double> spline_vals;
+        DynamicArray<double> x_nodes;
+        DynamicArray<double> f_nodes;
+        DynamicArray<double> x_dense;
+        DynamicArray<double> spline_vals;
+        DynamicArray<double> exact_dense;
     };
 
-    // Инициализация без предупреждений
-    DataSet data25;
-    data25.step = 0.25;
-    DataSet data50;
-    data50.step = 0.5;
+    DataSet data;
+    data.step = 0.5;
 
-    // Заполнение узлов
-    for (double x = 0.0; x <= PI + 1e-12; x += data25.step)
-        data25.x_nodes.push_back(x);
-    for (double x = 0.0; x <= PI + 1e-12; x += data50.step)
-        data50.x_nodes.push_back(x);
+    int node_count = 0;
+    for (double x = 0.0; x <= PI + 1e-12; x += data.step) {
+        ++node_count;
+    }
 
-    auto fill_f = [](DataSet& ds) {
-        ds.f_nodes.resize(ds.x_nodes.size());
-        for (size_t i = 0; i < ds.x_nodes.size(); ++i)
-            ds.f_nodes[i] = std::sin(4.0 * ds.x_nodes[i]);
-    };
-    fill_f(data25);
-    fill_f(data50);
+    data.x_nodes.resize(node_count);
+    data.f_nodes.resize(node_count);
+    int node_index = 0;
+    for (double x = 0.0; x <= PI + 1e-12; x += data.step) {
+        data.x_nodes.set(node_index, x);
+        data.f_nodes.set(node_index, std::sin(4.0 * x));
+        ++node_index;
+    }
 
-    cubic_spline<double> spline25, spline50;
-    spline25.build(data25.x_nodes.data(), data25.f_nodes.data(),
-                   static_cast<int>(data25.x_nodes.size()));
-    spline50.build(data50.x_nodes.data(), data50.f_nodes.data(),
-                   static_cast<int>(data50.x_nodes.size()));
+    cubic_spline<double> spline;
+    spline.build(&data.x_nodes.get(0), &data.f_nodes.get(0), node_count);
 
     const int N_DENSE = 400;
-    auto fill_dense = [&](DataSet& ds, cubic_spline<double>& spline) {
-        ds.x_dense.resize(N_DENSE);
-        ds.spline_vals.resize(N_DENSE);
-        for (int i = 0; i < N_DENSE; ++i) {
-            double x = PI * i / (N_DENSE - 1);
-            ds.x_dense[i] = x;
-            ds.spline_vals[i] = spline.evaluate(x);
-        }
-    };
-    fill_dense(data25, spline25);
-    fill_dense(data50, spline50);
-
-    std::vector<double> exact_dense(N_DENSE);
-    for (int i = 0; i < N_DENSE; ++i)
-        exact_dense[i] = std::sin(4.0 * data25.x_dense[i]);
+    data.x_dense.resize(N_DENSE);
+    data.spline_vals.resize(N_DENSE);
+    data.exact_dense.resize(N_DENSE);
+    for (int i = 0; i < N_DENSE; ++i) {
+        double x = PI * i / (N_DENSE - 1);
+        data.x_dense.set(i, x);
+        data.spline_vals.set(i, spline.evaluate(x));
+        data.exact_dense.set(i, std::sin(4.0 * x));
+    }
 
     // Инициализация GLFW + ImGui + ImPlot
     if (!glfwInit()) {
@@ -118,31 +106,12 @@ void menu_spline_viewer() {
         ImGui::Begin("Spline vs sin(4x)", nullptr,
                      ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoTitleBar);
 
-        if (ImPlot::BeginPlot("##Exact")) {
-            ImPlot::SetupAxes("x", "sin(4x)");
-            ImPlot::PlotLine("sin(4x)", data25.x_dense.data(), exact_dense.data(), N_DENSE);
-            ImPlot::EndPlot();
-        }
-        ImGui::SameLine();
-
-        if (ImPlot::BeginPlot("##Step025")) {
-            ImPlot::SetupAxes("x", "S(x) / sin(4x)");
-            ImPlot::PlotLine("Exact", data25.x_dense.data(), exact_dense.data(), N_DENSE);
-            ImPlot::PlotLine("Spline (step 0.25)", data25.x_dense.data(), data25.spline_vals.data(), N_DENSE);
+        if (ImPlot::BeginPlot("##ExactAndSpline")) {
+            ImPlot::SetupAxes("x", "y");
+            ImPlot::PlotLine("sin(4x)", &data.x_dense[0], &data.exact_dense[0], N_DENSE);
+            ImPlot::PlotLine("Spline (step 0.5)", &data.x_dense[0], &data.spline_vals[0], N_DENSE);
             ImPlot::SetNextMarkerStyle(ImPlotMarker_Circle);
-            ImPlot::PlotScatter("Nodes", data25.x_nodes.data(), data25.f_nodes.data(),
-                                static_cast<int>(data25.x_nodes.size()));
-            ImPlot::EndPlot();
-        }
-        ImGui::SameLine();
-
-        if (ImPlot::BeginPlot("##Step050")) {
-            ImPlot::SetupAxes("x", "S(x) / sin(4x)");
-            ImPlot::PlotLine("Exact", data25.x_dense.data(), exact_dense.data(), N_DENSE);
-            ImPlot::PlotLine("Spline (step 0.5)", data50.x_dense.data(), data50.spline_vals.data(), N_DENSE);
-            ImPlot::SetNextMarkerStyle(ImPlotMarker_Circle);
-            ImPlot::PlotScatter("Nodes", data50.x_nodes.data(), data50.f_nodes.data(),
-                                static_cast<int>(data50.x_nodes.size()));
+            ImPlot::PlotScatter("Nodes", &data.x_nodes[0], &data.f_nodes[0], data.x_nodes.get_size());
             ImPlot::EndPlot();
         }
         ImGui::End();
