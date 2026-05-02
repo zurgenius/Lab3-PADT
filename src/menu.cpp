@@ -3,7 +3,7 @@
 #include "array_sequence.h"
 #include "list_sequence.h"
 #include "utils.h"
-
+#include "spline_visualization.h"
 #include <cstdlib>
 #include <iostream>
 #include <stdexcept>
@@ -325,6 +325,7 @@ void run_menu() {
         std::cout << "9. Reduce (sum)" << std::endl;
         std::cout << "10. Slice" << std::endl;
         std::cout << "11. Run tests" << std::endl;
+        std::cout << "12. Spline viewer" << std::endl;
         std::cout << "0. Exit" << std::endl;
         std::cout << "Choice: ";
         utils::read_int(choice);
@@ -362,6 +363,9 @@ void run_menu() {
             break;
         case 11:
             menu_run_tests();
+            break;
+        case 12: 
+            menu_spline_viewer(); 
             break;
         case 0:
             break;

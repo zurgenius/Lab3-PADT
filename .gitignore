@@ -46,3 +46,6 @@ build/
 build-lint/
 
 tz.md
+
+.vscode
+.idea
