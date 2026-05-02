@@ -2,8 +2,8 @@
 
 #include "array_sequence.h"
 #include "list_sequence.h"
-#include "utils.h"
 #include "spline_visualization.h"
+#include "utils.h"
 #include <cstdlib>
 #include <iostream>
 #include <stdexcept>
@@ -364,8 +364,8 @@ void run_menu() {
         case 11:
             menu_run_tests();
             break;
-        case 12: 
-            menu_spline_viewer(); 
+        case 12:
+            menu_spline_viewer();
             break;
         case 0:
             break;

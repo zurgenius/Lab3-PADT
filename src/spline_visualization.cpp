@@ -1,16 +1,16 @@
 #include "cubic_spline.h"
 #include "dynamic_array.h"
 #include <cmath>
-#include <numbers>
 #include <iostream>
+#include <numbers>
 
 // Убираем GLFW_INCLUDE_NONE, чтобы GLFW сам включил нужный OpenGL заголовок
 #include <GLFW/glfw3.h>
 
 // Но на macOS нужен дополнительный флаг для подавления предупреждений об устаревании OpenGL
 #if defined(__APPLE__)
-    #define GL_SILENCE_DEPRECATION
-    #include <OpenGL/gl3.h>
+#define GL_SILENCE_DEPRECATION
+#include <OpenGL/gl3.h>
 #endif
 
 #include "imgui.h"
@@ -70,14 +70,15 @@ void menu_spline_viewer() {
         return;
     }
 
-    const char* glsl_version = "#version 150";
+    const char *glsl_version = "#version 150";
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     // На macOS обязательно
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 
-    GLFWwindow* window = glfwCreateWindow(1280, 720, "Cubic Spline Interpolation", nullptr, nullptr);
+    GLFWwindow *window =
+        glfwCreateWindow(1280, 720, "Cubic Spline Interpolation", nullptr, nullptr);
     if (!window) {
         glfwTerminate();
         std::cout << "Failed to create window" << std::endl;
@@ -111,7 +112,8 @@ void menu_spline_viewer() {
             ImPlot::PlotLine("sin(4x)", &data.x_dense[0], &data.exact_dense[0], N_DENSE);
             ImPlot::PlotLine("Spline (step 0.5)", &data.x_dense[0], &data.spline_vals[0], N_DENSE);
             ImPlot::SetNextMarkerStyle(ImPlotMarker_Circle);
-            ImPlot::PlotScatter("Nodes", &data.x_nodes[0], &data.f_nodes[0], data.x_nodes.get_size());
+            ImPlot::PlotScatter("Nodes", &data.x_nodes[0], &data.f_nodes[0],
+                                data.x_nodes.get_size());
             ImPlot::EndPlot();
         }
         ImGui::End();

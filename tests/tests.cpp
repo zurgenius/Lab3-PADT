@@ -3,8 +3,14 @@
 #include "list_sequence.h"
 #include "utils.h"
 
-#include <gtest/gtest.h>
 #include <cmath>
+#include <gtest/gtest.h>
+
+double add_one(const double &value) { return value + 1.0; }
+
+bool is_positive_double(const double &value) { return value > 0.0; }
+
+double sum_double(const double &left, const double &right) { return left + right; }
 
 TEST(DynamicArrayTest, DefaultConstructorCreatesEmptyArray) {
     DynamicArray<int> array;
@@ -690,4 +696,123 @@ TEST(CubicSplineTest, EvaluateMatchesLinearFunctionBetweenNodes) {
     EXPECT_NEAR(spline.evaluate(0.5), 2.0, 1e-12);
     EXPECT_NEAR(spline.evaluate(1.5), 4.0, 1e-12);
     EXPECT_NEAR(spline.evaluate(2.5), 6.0, 1e-12);
+}
+
+TEST(CubicSplineSequenceTest, AccessorsReturnFValues) {
+    double x[] = {0.0, 1.0, 2.0};
+    double f[] = {1.0, 2.0, 3.0};
+    cubic_spline<double> spline;
+
+    spline.build(x, f, 3);
+
+    Sequence<double> *seq = &spline;
+    EXPECT_EQ(seq->get_count(), 3);
+    EXPECT_DOUBLE_EQ(seq->get_first(), 1.0);
+    EXPECT_DOUBLE_EQ(seq->get_last(), 3.0);
+    EXPECT_DOUBLE_EQ(seq->get(1), 2.0);
+    EXPECT_TRUE(seq->try_get_first().has_value());
+    EXPECT_DOUBLE_EQ(seq->try_get(1).get_value(), 2.0);
+}
+
+TEST(CubicSplineSequenceTest, AppendAddsValueToEnd) {
+    double x[] = {0.0, 1.0, 2.0};
+    double f[] = {1.0, 2.0, 3.0};
+    cubic_spline<double> spline;
+
+    spline.build(x, f, 3);
+    spline.append(4.0);
+
+    EXPECT_EQ(spline.get_count(), 4);
+    EXPECT_DOUBLE_EQ(spline.get_last(), 4.0);
+    EXPECT_DOUBLE_EQ(spline.get(3), 4.0);
+}
+
+TEST(CubicSplineSequenceTest, PrependAddsValueToStart) {
+    double x[] = {0.0, 1.0, 2.0};
+    double f[] = {1.0, 2.0, 3.0};
+    cubic_spline<double> spline;
+
+    spline.build(x, f, 3);
+    spline.prepend(0.0);
+
+    EXPECT_EQ(spline.get_count(), 4);
+    EXPECT_DOUBLE_EQ(spline.get_first(), 0.0);
+    EXPECT_DOUBLE_EQ(spline.get(1), 1.0);
+}
+
+TEST(CubicSplineSequenceTest, InsertAtAddsValueInMiddle) {
+    double x[] = {0.0, 1.0, 2.0};
+    double f[] = {1.0, 2.0, 3.0};
+    cubic_spline<double> spline;
+
+    spline.build(x, f, 3);
+    spline.insert_at(1.5, 1);
+
+    EXPECT_EQ(spline.get_count(), 4);
+    EXPECT_DOUBLE_EQ(spline.get(1), 1.5);
+    EXPECT_DOUBLE_EQ(spline.get(2), 2.0);
+}
+
+TEST(CubicSplineSequenceTest, MapWhereReduceWorkOnSpline) {
+    double x[] = {0.0, 1.0, 2.0, 3.0};
+    double f[] = {1.0, -2.0, 3.0, -4.0};
+    cubic_spline<double> spline;
+
+    spline.build(x, f, 4);
+
+    Sequence<double> *mapped = spline.map(add_one);
+    EXPECT_DOUBLE_EQ(mapped->get(0), 2.0);
+    EXPECT_DOUBLE_EQ(mapped->get(1), -1.0);
+    delete mapped;
+
+    Sequence<double> *filtered = spline.where(is_positive_double);
+    EXPECT_EQ(filtered->get_count(), 2);
+    EXPECT_DOUBLE_EQ(filtered->get(0), 1.0);
+    EXPECT_DOUBLE_EQ(filtered->get(1), 3.0);
+    delete filtered;
+
+    EXPECT_DOUBLE_EQ(spline.reduce(sum_double, 0.0), -2.0);
+}
+
+TEST(CubicSplineSequenceTest, ConcatCreatesCombinedSequence) {
+    double x1[] = {0.0, 1.0, 2.0};
+    double f1[] = {1.0, 2.0, 3.0};
+    double x2[] = {0.0, 1.0, 2.0};
+    double f2[] = {4.0, 5.0, 6.0};
+    cubic_spline<double> left;
+    cubic_spline<double> right;
+
+    left.build(x1, f1, 3);
+    right.build(x2, f2, 3);
+
+    Sequence<double> *joined = left.concat(&right);
+    EXPECT_EQ(joined->get_count(), 6);
+    EXPECT_DOUBLE_EQ(joined->get(2), 3.0);
+    EXPECT_DOUBLE_EQ(joined->get(3), 4.0);
+    delete joined;
+}
+
+TEST(CubicSplineSequenceTest, SubSequenceAndSliceFollowSequenceRules) {
+    double x[] = {0.0, 1.0, 2.0, 3.0, 4.0};
+    double f[] = {1.0, 2.0, 3.0, 4.0, 5.0};
+    cubic_spline<double> spline;
+
+    spline.build(x, f, 5);
+
+    Sequence<double> *subseq = spline.get_sub_sequence(1, 3);
+    EXPECT_EQ(subseq->get_count(), 3);
+    EXPECT_DOUBLE_EQ(subseq->get(0), 2.0);
+    EXPECT_DOUBLE_EQ(subseq->get(2), 4.0);
+    delete subseq;
+
+    double replacement_items[] = {8.0, 9.0};
+    MutableArraySequence<double> replacement(replacement_items, 2);
+    Sequence<double> *sliced = spline.slice(1, 2, &replacement);
+    EXPECT_EQ(sliced->get_count(), 5);
+    EXPECT_DOUBLE_EQ(sliced->get(0), 1.0);
+    EXPECT_DOUBLE_EQ(sliced->get(1), 8.0);
+    EXPECT_DOUBLE_EQ(sliced->get(2), 9.0);
+    EXPECT_DOUBLE_EQ(sliced->get(3), 4.0);
+    EXPECT_DOUBLE_EQ(sliced->get(4), 5.0);
+    delete sliced;
 }
