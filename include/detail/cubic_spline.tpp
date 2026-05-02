@@ -49,6 +49,7 @@ void cubic_spline<T>::build(const T* x, const T* f, int n) {
         f_[i] = f[i];
     }
 
+    // вычисление h_i и delta_i
     T* delta = new T[n - 1];
     T* h     = new T[n - 1];
     for (int i = 0; i < n - 1; ++i) {
@@ -56,6 +57,8 @@ void cubic_spline<T>::build(const T* x, const T* f, int n) {
         delta[i] = (f_[i + 1] - f_[i]) / h[i];
     }
 
+    //построение трёхдиагональной системы Am = F
+    // здесь неизвестные - вторыке производные в узлах
     T** TriDiagMatrix = new T*[3];
     TriDiagMatrix[0] = new T[n];
     TriDiagMatrix[1] = new T[n];
@@ -74,26 +77,33 @@ void cubic_spline<T>::build(const T* x, const T* f, int n) {
     TriDiagMatrix[1][0] = T{1};
     TriDiagMatrix[1][n - 1] = T{1};
 
+    // в этом цикле строим уравнение для внутренних узлов; для крайних задаём m[0] = m[n-1] = 0 (естественный сплайн)
+    //такое уравнение гарантирует непрерывность первой производной в узлах
     for (int i = 1; i < n - 1; ++i) {
         TriDiagMatrix[0][i] = h[i - 1];
         TriDiagMatrix[1][i] = T{2} * (h[i - 1] + h[i]);
         TriDiagMatrix[2][i] = h[i];
         f_vec[i] = T{6} * (delta[i] - delta[i - 1]);
-    }
+    } 
+    
 
+    //решение системы методом прогонки (Томаса)
     solve_tridiag(TriDiagMatrix, f_vec, m);
 
+    // вычисление коэффициентов сплайна
     Coef_ = new T*[4];
     Coef_[0] = new T[n - 1];
     Coef_[1] = new T[n - 1];
     Coef_[2] = new T[n - 1];
     Coef_[3] = new T[n - 1];
 
+    //храним матрицу коээфициентов 4*n-1, где n-1 - кол-во кусков в сплайне
+    // по этой матрице можем однозначно задать кусочно-заданную функцию из кубических полиномов
     for (int j = 0; j < n - 1; ++j) {
-        Coef_[0][j] = f_[j];
-        Coef_[1][j] = delta[j] - h[j] * (T{2} * m[j] + m[j + 1]) / T{6};
-        Coef_[2][j] = m[j] / T{2};
-        Coef_[3][j] = (m[j + 1] - m[j]) / (T{6} * h[j]);
+        Coef_[0][j] = f_[j]; // a_j
+        Coef_[1][j] = delta[j] - h[j] * (T{2} * m[j] + m[j + 1]) / T{6}; // b_j
+        Coef_[2][j] = m[j] / T{2}; // c_j
+        Coef_[3][j] = (m[j + 1] - m[j]) / (T{6} * h[j]); // d_j
     }
 
     delete[] delta;
@@ -108,20 +118,27 @@ void cubic_spline<T>::build(const T* x, const T* f, int n) {
 
 template <Field T>
 T cubic_spline<T>::evaluate(const T& x) const {
-    // Поиск нужного сегмента (линейный; можно заменить бинарным при необходимости)
-    int i = 0;
-    while (i < n_ && x_[i] < x) {
-        ++i;
+    // Бинарный поиск интервала
+    int left = 0;
+    int right = n_ - 1;
+    while (left <= right) {
+        int mid = left + (right - left) / 2;
+        if (x < x_[mid]) {
+            right = mid - 1;
+        } else {
+            left = mid + 1;
+        }
     }
-    if (i == 0) {
+
+    int i = right;
+    if (i < 0) {
         i = 0;
-    } else if (i == n_) {
+    } else if (i >= n_ - 1) {
         i = n_ - 2;
-    } else {
-        --i;
     }
 
     T dx = x - x_[i];
+    
     // S_i(x) = a_i + b_i*dx + c_i*dx^2 + d_i*dx^3
     return Coef_[0][i]
            + Coef_[1][i] * dx
@@ -131,6 +148,8 @@ T cubic_spline<T>::evaluate(const T& x) const {
 
 template <Field T>
 void cubic_spline<T>::solve_tridiag(T** TDM, T* F, T* b) {
+    // решение через метод Томаса, оптимально для трёхдиагональных систем
+    // дает O(n) по времени
     T* alph = new T[n_ - 1];
     T* beta = new T[n_ - 1];
 
