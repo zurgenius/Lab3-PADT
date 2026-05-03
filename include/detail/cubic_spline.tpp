@@ -4,11 +4,10 @@
 #include <stdexcept>
 
 template <Field T>
-cubic_spline<T>::cubic_spline() : nodes_count(0), x_coordinates(nullptr), function_values(nullptr), piecewise_given_func_coefs(nullptr) {}
+CubicSpline<T>::CubicSpline() : nodes_count(0), nodes(nullptr), piecewise_given_func_coefs(nullptr) {}
 
-template <Field T> cubic_spline<T>::~cubic_spline() {
-    delete[] x_coordinates;
-    delete[] function_values;
+template <Field T> CubicSpline<T>::~CubicSpline() {
+    delete[] nodes;
     if (piecewise_given_func_coefs) {
         delete[] piecewise_given_func_coefs[0];
         delete[] piecewise_given_func_coefs[1];
@@ -18,18 +17,15 @@ template <Field T> cubic_spline<T>::~cubic_spline() {
     }
 }
 
-template <Field T> void cubic_spline<T>::build(const T *x, const T *f, int n) {
+
+template <Field T> void CubicSpline<T>::build(const Point<T> *points, int n) {
     if (n < 3) {
-        throw std::invalid_argument("cubic_spline::build: at least 3 points required");
+        throw std::invalid_argument("CubicSpline::build: at least 3 points required");
     }
 
-    if (x_coordinates) {
-        delete[] x_coordinates;
-        x_coordinates = nullptr;
-    }
-    if (function_values) {
-        delete[] function_values;
-        function_values = nullptr;
+    if (nodes) {
+        delete[] nodes;
+        nodes = nullptr;
     }
     if (piecewise_given_func_coefs) {
         delete[] piecewise_given_func_coefs[0];
@@ -41,23 +37,21 @@ template <Field T> void cubic_spline<T>::build(const T *x, const T *f, int n) {
     }
 
     nodes_count = n;
-    x_coordinates = new T[n];
-    function_values = new T[n];
+    nodes = new Point<T>[n];
     for (int i = 0; i < n; ++i) {
-        x_coordinates[i] = x[i];
-        function_values[i] = f[i];
+        nodes[i] = points[i];
     }
 
     // вычисление h_i и delta_i
     T *delta = new T[n - 1];
     T *h = new T[n - 1];
     for (int i = 0; i < n - 1; ++i) {
-        h[i] = x_coordinates[i + 1] - x_coordinates[i];
-        delta[i] = (function_values[i + 1] - function_values[i]) / h[i];
+        h[i] = nodes[i + 1].x - nodes[i].x;
+        delta[i] = (nodes[i + 1].y - nodes[i].y) / h[i];
     }
 
     // построение трёхдиагональной системы Am = F
-    //  здесь неизвестные - вторыке производные в узлах
+    //  здесь неизвестные - вторые производные в узлах
     T **TriDiagMatrix = new T *[3];
     TriDiagMatrix[0] = new T[n];
     TriDiagMatrix[1] = new T[n];
@@ -99,7 +93,7 @@ template <Field T> void cubic_spline<T>::build(const T *x, const T *f, int n) {
     // храним матрицу коээфициентов 4*n-1, где n-1 - кол-во кусков в сплайне
     //  по этой матрице можем однозначно задать кусочно-заданную функцию из кубических полиномов
     for (int j = 0; j < n - 1; ++j) {
-        piecewise_given_func_coefs[0][j] = function_values[j];                                             // a_j
+        piecewise_given_func_coefs[0][j] = nodes[j].y;                                             // a_j
         piecewise_given_func_coefs[1][j] = delta[j] - h[j] * (T{2} * m[j] + m[j + 1]) / T{6}; // b_j
         piecewise_given_func_coefs[2][j] = m[j] / T{2};                                       // c_j
         piecewise_given_func_coefs[3][j] = (m[j + 1] - m[j]) / (T{6} * h[j]);                 // d_j
@@ -115,14 +109,10 @@ template <Field T> void cubic_spline<T>::build(const T *x, const T *f, int n) {
     delete[] m;
 }
 
-template <Field T> void cubic_spline<T>::take_raw(T *x, T *f, int n) {
-    if (x_coordinates) {
-        delete[] x_coordinates;
-        x_coordinates = nullptr;
-    }
-    if (function_values) {
-        delete[] function_values;
-        function_values = nullptr;
+template <Field T> void CubicSpline<T>::take_raw(Point<T> *points, int n) {
+    if (nodes) {
+        delete[] nodes;
+        nodes = nullptr;
     }
     if (piecewise_given_func_coefs) {
         delete[] piecewise_given_func_coefs[0];
@@ -134,17 +124,16 @@ template <Field T> void cubic_spline<T>::take_raw(T *x, T *f, int n) {
     }
 
     nodes_count = n;
-    x_coordinates = x;
-    function_values = f;
+    nodes = points;
 }
 
-template <Field T> T cubic_spline<T>::evaluate(const T &x) const {
+template <Field T> T CubicSpline<T>::evaluate(const T &x) const {
     // Бинарный поиск интервала
     int left = 0;
     int right = nodes_count - 1;
     while (left <= right) {
         int mid = left + (right - left) / 2;
-        if (x < x_coordinates[mid]) {
+        if (x < nodes[mid].x) {
             right = mid - 1;
         } else {
             left = mid + 1;
@@ -158,128 +147,108 @@ template <Field T> T cubic_spline<T>::evaluate(const T &x) const {
         i = nodes_count - 2;
     }
 
-    T dx = x - x_coordinates[i];
+    T dx = x - nodes[i].x;
 
     // S_i(x) = a_i + b_i*dx + c_i*dx^2 + d_i*dx^3
     return piecewise_given_func_coefs[0][i] + piecewise_given_func_coefs[1][i] * dx + piecewise_given_func_coefs[2][i] * dx * dx + piecewise_given_func_coefs[3][i] * dx * dx * dx;
 }
 
-template <Field T> const T &cubic_spline<T>::get_first() const {
+template <Field T> const Point<T> &CubicSpline<T>::get_first() const {
     if (nodes_count == 0) {
         throw std::out_of_range("Sequence is empty");
     }
-    return function_values[0];
+    return nodes[0];
 }
 
-template <Field T> const T &cubic_spline<T>::get_last() const {
+template <Field T> const Point<T> &CubicSpline<T>::get_last() const {
     if (nodes_count == 0) {
         throw std::out_of_range("Sequence is empty");
     }
-    return function_values[nodes_count - 1];
+    return nodes[nodes_count - 1];
 }
 
-template <Field T> const T &cubic_spline<T>::get(int index) const {
+template <Field T> const Point<T> &CubicSpline<T>::get(int index) const {
     if (index < 0 || index >= nodes_count) {
         throw std::out_of_range("Index out of range");
     }
-    return function_values[index];
+    return nodes[index];
 }
 
-template <Field T> Option<T> cubic_spline<T>::try_get_first() const {
-    return nodes_count == 0 ? Option<T>::None() : Option<T>::Some(function_values[0]);
+template <Field T> Option<Point<T>> CubicSpline<T>::try_get_first() const {
+    return nodes_count == 0 ? Option<Point<T>>::None() : Option<Point<T>>::Some(nodes[0]);
 }
 
-template <Field T> Option<T> cubic_spline<T>::try_get_last() const {
-    return nodes_count == 0 ? Option<T>::None() : Option<T>::Some(function_values[nodes_count - 1]);
+template <Field T> Option<Point<T>> CubicSpline<T>::try_get_last() const {
+    return nodes_count == 0 ? Option<Point<T>>::None() : Option<Point<T>>::Some(nodes[nodes_count - 1]);
 }
 
-template <Field T> Option<T> cubic_spline<T>::try_get(int index) const {
-    return (index < 0 || index >= nodes_count) ? Option<T>::None() : Option<T>::Some(function_values[index]);
+template <Field T> Option<Point<T>> CubicSpline<T>::try_get(int index) const {
+    return (index < 0 || index >= nodes_count) ? Option<Point<T>>::None() : Option<Point<T>>::Some(nodes[index]);
 }
 
-template <Field T> int cubic_spline<T>::get_count() const { return nodes_count; }
+template <Field T> int CubicSpline<T>::get_count() const { return nodes_count; }
 
-template <Field T> Sequence<T> *cubic_spline<T>::get_sub_sequence(int start, int end) {
+template <Field T> Sequence<Point<T>> *CubicSpline<T>::get_sub_sequence(int start, int end) {
     if (start < 0 || end < 0 || start >= nodes_count || end >= nodes_count || start > end) {
         throw std::out_of_range("Index out of range");
     }
 
     const int length = end - start + 1;
-    T *new_x = new T[length];
-    T *new_f = new T[length];
+    Point<T> *new_points = new Point<T>[length];
     for (int offset = 0; offset < length; offset++) {
-        new_x[offset] = x_coordinates[start + offset];
-        new_f[offset] = function_values[start + offset];
+        new_points[offset] = nodes[start + offset];
     }
 
-    cubic_spline<T> *result = new cubic_spline<T>();
+    CubicSpline<T> *result = new CubicSpline<T>();
     if (length >= 3) {
-        result->build(new_x, new_f, length);
-        delete[] new_x;
-        delete[] new_f;
+        result->build(new_points, length);
+        delete[] new_points;
     } else {
-        result->take_raw(new_x, new_f, length);
+        result->take_raw(new_points, length);
     }
 
     return result;
 }
 
-template <Field T> Sequence<T> *cubic_spline<T>::append(const T &item) {
+template <Field T> Sequence<Point<T>> *CubicSpline<T>::append(const Point<T> &item) {
     const int new_count = nodes_count + 1;
-    T *new_x = new T[new_count];
-    T *new_f = new T[new_count];
+    Point<T> *new_points = new Point<T>[new_count];
     for (int index = 0; index < nodes_count; index++) {
-        new_x[index] = x_coordinates[index];
-        new_f[index] = function_values[index];
+        new_points[index] = nodes[index];
     }
 
-    if (nodes_count == 0) {
-        new_x[0] = T{0};
-    } else {
-        new_x[nodes_count] = x_coordinates[nodes_count - 1] + T{1};
-    }
-    new_f[nodes_count] = item;
+    new_points[nodes_count] = item;
 
     if (new_count >= 3) {
-        build(new_x, new_f, new_count);
-        delete[] new_x;
-        delete[] new_f;
+        build(new_points, new_count);
+        delete[] new_points;
     } else {
-        take_raw(new_x, new_f, new_count);
+        take_raw(new_points, new_count);
     }
 
     return this;
 }
 
-template <Field T> Sequence<T> *cubic_spline<T>::prepend(const T &item) {
+template <Field T> Sequence<Point<T>> *CubicSpline<T>::prepend(const Point<T> &item) {
     const int new_count = nodes_count + 1;
-    T *new_x = new T[new_count];
-    T *new_f = new T[new_count];
-
-    if (nodes_count == 0) {
-        new_x[0] = T{0};
-    } else {
-        new_x[0] = x_coordinates[0] - T{1};
-    }
-    new_f[0] = item;
+    Point<T> *new_points = new Point<T>[new_count];
+    new_points[0] = item;
 
     for (int index = 0; index < nodes_count; index++) {
-        new_x[index + 1] = x_coordinates[index];
-        new_f[index + 1] = function_values[index];
+        new_points[index + 1] = nodes[index];
     }
 
     if (new_count >= 3) {
-        build(new_x, new_f, new_count);
-        delete[] new_x;
-        delete[] new_f;
+        build(new_points, new_count);
+        delete[] new_points;
     } else {
-        take_raw(new_x, new_f, new_count);
+        take_raw(new_points, new_count);
     }
 
     return this;
 }
 
-template <Field T> Sequence<T> *cubic_spline<T>::insert_at(const T &item, int index) {
+template <Field T> Sequence<Point<T>> *CubicSpline<T>::insert_at(const Point<T> &item, int index) {
     if (index < 0 || index > nodes_count) {
         throw std::out_of_range("Index out of range");
     }
@@ -291,140 +260,126 @@ template <Field T> Sequence<T> *cubic_spline<T>::insert_at(const T &item, int in
     }
 
     const int new_count = nodes_count + 1;
-    T *new_x = new T[new_count];
-    T *new_f = new T[new_count];
+    Point<T> *new_points = new Point<T>[new_count];
 
     for (int current = 0; current < index; current++) {
-        new_x[current] = x_coordinates[current];
-        new_f[current] = function_values[current];
+        new_points[current] = nodes[current];
     }
 
-    new_x[index] = (x_coordinates[index - 1] + x_coordinates[index]) / T{2};
-    new_f[index] = item;
+    new_points[index] = item;
 
     for (int current = index; current < nodes_count; current++) {
-        new_x[current + 1] = x_coordinates[current];
-        new_f[current + 1] = function_values[current];
+        new_points[current + 1] = nodes[current];
     }
 
     if (new_count >= 3) {
-        build(new_x, new_f, new_count);
-        delete[] new_x;
-        delete[] new_f;
+        build(new_points, new_count);
+        delete[] new_points;
     } else {
-        take_raw(new_x, new_f, new_count);
+        take_raw(new_points, new_count);
     }
 
     return this;
 }
 
-template <Field T> Sequence<T> *cubic_spline<T>::concat(const Sequence<T> *other) {
+template <Field T> Sequence<Point<T>> *CubicSpline<T>::concat(const Sequence<Point<T>> *other) {
     if (other == nullptr) {
         throw std::invalid_argument("Cannot concat with nullptr");
     }
 
     const int other_count = other->get_count();
     const int new_count = nodes_count + other_count;
-    cubic_spline<T> *result = new cubic_spline<T>();
+    CubicSpline<T> *result = new CubicSpline<T>();
     if (new_count == 0) {
         return result;
     }
 
-    T *new_x = new T[new_count];
-    T *new_f = new T[new_count];
+    Point<T> *new_points = new Point<T>[new_count];
     for (int index = 0; index < nodes_count; index++) {
-        new_x[index] = x_coordinates[index];
-        new_f[index] = function_values[index];
+        new_points[index] = nodes[index];
     }
 
-    T start_x = (nodes_count == 0) ? T{0} : x_coordinates[nodes_count - 1] + T{1};
     for (int index = 0; index < other_count; index++) {
-        new_x[nodes_count + index] = start_x + static_cast<T>(index);
-        new_f[nodes_count + index] = other->get(index);
+        new_points[nodes_count + index] = other->get(index);
     }
 
     if (new_count >= 3) {
-        result->build(new_x, new_f, new_count);
-        delete[] new_x;
-        delete[] new_f;
+        result->build(new_points, new_count);
+        delete[] new_points;
     } else {
-        result->take_raw(new_x, new_f, new_count);
+        result->take_raw(new_points, new_count);
     }
 
     return result;
 }
 
-template <Field T> Sequence<T> *cubic_spline<T>::map(T (*func)(const T &elem)) {
+template <Field T> Sequence<Point<T>> *CubicSpline<T>::map(Point<T> (*func)(const Point<T> &elem)) {
     if (nodes_count == 0) {
-        return new cubic_spline<T>();
+        return new CubicSpline<T>();
     }
 
-    T *new_x = new T[nodes_count];
-    T *new_f = new T[nodes_count];
+    Point<T> *new_points = new Point<T>[nodes_count];
     for (int index = 0; index < nodes_count; index++) {
-        new_x[index] = x_coordinates[index];
-        new_f[index] = func(function_values[index]);
+        new_points[index] = func(nodes[index]);
     }
 
-    cubic_spline<T> *result = new cubic_spline<T>();
+    CubicSpline<T> *result = new CubicSpline<T>();
     if (nodes_count >= 3) {
-        result->build(new_x, new_f, nodes_count);
-        delete[] new_x;
-        delete[] new_f;
+        result->build(new_points, nodes_count);
+        delete[] new_points;
     } else {
-        result->take_raw(new_x, new_f, nodes_count);
+        result->take_raw(new_points, nodes_count);
     }
 
     return result;
 }
 
-template <Field T> Sequence<T> *cubic_spline<T>::where(bool (*predicate)(const T &elem)) {
+template <Field T> Sequence<Point<T>> *CubicSpline<T>::where(bool (*predicate)(const Point<T> &elem)) {
     int matches = 0;
     for (int index = 0; index < nodes_count; index++) {
-        if (predicate(function_values[index])) {
+        if (predicate(nodes[index])) {
             matches++;
         }
     }
 
-    cubic_spline<T> *result = new cubic_spline<T>();
+    CubicSpline<T> *result = new CubicSpline<T>();
     if (matches == 0) {
         return result;
     }
 
-    T *new_x = new T[matches];
-    T *new_f = new T[matches];
+    Point<T> *new_points = new Point<T>[matches];
     int write_index = 0;
     for (int index = 0; index < nodes_count; index++) {
-        if (predicate(function_values[index])) {
-            new_x[write_index] = x_coordinates[index];
-            new_f[write_index] = function_values[index];
+        if (predicate(nodes[index])) {
+            new_points[write_index] = nodes[index];
             write_index++;
         }
     }
 
     if (matches >= 3) {
-        result->build(new_x, new_f, matches);
-        delete[] new_x;
-        delete[] new_f;
+        result->build(new_points, matches);
+        delete[] new_points;
     } else {
-        result->take_raw(new_x, new_f, matches);
+        result->take_raw(new_points, matches);
     }
 
     return result;
 }
 
 template <Field T>
-T cubic_spline<T>::reduce(T (*func)(const T &first_elem, const T &second_elem),
-                          const T &initial_elem) {
-    T accumulated = initial_elem;
+Point<T> CubicSpline<T>::reduce(Point<T> (*func)(const Point<T> &first_elem,
+                                                  const Point<T> &second_elem),
+                                 const Point<T> &initial_elem) {
+    Point<T> accumulated = initial_elem;
     for (int index = 0; index < nodes_count; index++) {
-        accumulated = func(accumulated, function_values[index]);
+        accumulated = func(accumulated, nodes[index]);
     }
     return accumulated;
 }
 
 template <Field T>
-Sequence<T> *cubic_spline<T>::slice(int index, int count, const Sequence<T> *replace_seq) {
+Sequence<Point<T>> *CubicSpline<T>::slice(int index, int count,
+                                           const Sequence<Point<T>> *replace_seq) {
     const int length = nodes_count;
     if (count < 0) {
         throw std::invalid_argument("Slice count cannot be negative");
@@ -444,68 +399,45 @@ Sequence<T> *cubic_spline<T>::slice(int index, int count, const Sequence<T> *rep
     const int replacement_count = (replace_seq == nullptr) ? 0 : replace_seq->get_count();
     const int result_count = index + replacement_count + (length - index - removed);
 
-    cubic_spline<T> *result = new cubic_spline<T>();
+    CubicSpline<T> *result = new CubicSpline<T>();
     if (result_count == 0) {
         return result;
     }
 
-    T *new_x = new T[result_count];
-    T *new_f = new T[result_count];
+    Point<T> *new_points = new Point<T>[result_count];
     int write_index = 0;
     for (int current = 0; current < index; current++) {
-        new_x[write_index] = x_coordinates[current];
-        new_f[write_index] = function_values[current];
+        new_points[write_index] = nodes[current];
         write_index++;
     }
 
     if (replacement_count > 0) {
-        const bool has_left = index > 0;
-        const bool has_right = (index + removed) < length;
-        T left_x = has_left ? x_coordinates[index - 1] : T{0};
-        T right_x = has_right ? x_coordinates[index + removed] : T{0};
-
-        T step = T{1};
-        if (has_left && has_right) {
-            step = (right_x - left_x) / static_cast<T>(replacement_count + 1);
-        }
-
         for (int current = 0; current < replacement_count; current++) {
-            if (has_left && has_right) {
-                new_x[write_index] = left_x + step * static_cast<T>(current + 1);
-            } else if (has_left) {
-                new_x[write_index] = left_x + static_cast<T>(current + 1);
-            } else if (has_right) {
-                new_x[write_index] = right_x - static_cast<T>(replacement_count - current);
-            } else {
-                new_x[write_index] = static_cast<T>(current);
-            }
-            new_f[write_index] = replace_seq->get(current);
+            new_points[write_index] = replace_seq->get(current);
             write_index++;
         }
     }
 
     for (int current = index + removed; current < length; current++) {
-        new_x[write_index] = x_coordinates[current];
-        new_f[write_index] = function_values[current];
+        new_points[write_index] = nodes[current];
         write_index++;
     }
 
     if (result_count >= 3) {
-        result->build(new_x, new_f, result_count);
-        delete[] new_x;
-        delete[] new_f;
+        result->build(new_points, result_count);
+        delete[] new_points;
     } else {
-        result->take_raw(new_x, new_f, result_count);
+        result->take_raw(new_points, result_count);
     }
 
     return result;
 }
 
-template <Field T> IEnumerator<T> *cubic_spline<T>::get_enumerator() const {
-    return new Enumerator(function_values, nodes_count);
+template <Field T> IEnumerator<Point<T>> *CubicSpline<T>::get_enumerator() const {
+    return new Enumerator(nodes, nodes_count);
 }
 
-template <Field T> void cubic_spline<T>::solve_tridiag(T **TDM, T *F, T *b) {
+template <Field T> void CubicSpline<T>::solve_tridiag(T **TDM, T *F, T *b) {
     // решение через метод Томаса, оптимально для трёхдиагональных систем
     // дает O(n) по времени
     T *alph = new T[nodes_count - 1];

@@ -46,6 +46,8 @@ build/
 build-lint/
 
 tz.md
+AGENTS.md
+
 
 .vscode
 .idea

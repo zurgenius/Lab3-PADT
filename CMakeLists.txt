@@ -53,7 +53,11 @@ enable_testing()
 include(GoogleTest)
 
 add_executable(lab2_tests
-    tests/tests.cpp
+    tests/array_sequence_tests.cpp
+    tests/cubic_spline_tests.cpp
+    tests/dynamic_array_tests.cpp
+    tests/linked_list_tests.cpp
+    tests/list_sequence_tests.cpp
 )
 set_target_properties(lab2_tests PROPERTIES OUTPUT_NAME tests_runner)
 target_include_directories(lab2_tests PRIVATE include)
