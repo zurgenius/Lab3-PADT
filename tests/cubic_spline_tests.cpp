@@ -10,6 +10,7 @@ Point<double> add_one(const Point<double> &value) {
 }
 
 bool is_positive_double(const Point<double> &value) { return value.y > 0.0; }
+bool is_large_double(const Point<double> &value) { return value.y > 100.0; }
 
 Point<double> sum_double(const Point<double> &left, const Point<double> &right) {
     Point<double> result{left.x, left.y + right.y};
@@ -156,6 +157,18 @@ TEST(CubicSplineSequenceTest, InsertAtAddsValueInMiddle) {
     EXPECT_DOUBLE_EQ(spline.get(2).y, 2.0);
 }
 
+TEST(CubicSplineSequenceTest, InsertAtAllowsBoundaryIndex) {
+    Point<double> points[] = {{0.0, 1.0}, {1.0, 2.0}, {2.0, 3.0}};
+    MutableCubicSpline<double> spline;
+
+    spline.build(points, 3);
+    spline.insert_at(Point<double>{3.0, 4.0}, spline.get_count());
+
+    EXPECT_EQ(spline.get_count(), 4);
+    EXPECT_DOUBLE_EQ(spline.get_last().x, 3.0);
+    EXPECT_DOUBLE_EQ(spline.get_last().y, 4.0);
+}
+
 TEST(CubicSplineSequenceTest, MapWhereReduceWorkOnSpline) {
     Point<double> points[] = {{0.0, 1.0}, {1.0, -2.0}, {2.0, 3.0}, {3.0, -4.0}};
     MutableCubicSpline<double> spline;
@@ -172,6 +185,10 @@ TEST(CubicSplineSequenceTest, MapWhereReduceWorkOnSpline) {
     EXPECT_DOUBLE_EQ(filtered->get(0).y, 1.0);
     EXPECT_DOUBLE_EQ(filtered->get(1).y, 3.0);
     delete filtered;
+
+    Sequence<Point<double>> *empty_filtered = spline.where(is_large_double);
+    EXPECT_EQ(empty_filtered->get_count(), 0);
+    delete empty_filtered;
 
     Point<double> reduced = spline.reduce(sum_double, Point<double>{0.0, 0.0});
     EXPECT_DOUBLE_EQ(reduced.y, -2.0);
@@ -215,4 +232,17 @@ TEST(CubicSplineSequenceTest, SubSequenceAndSliceFollowSequenceRules) {
     EXPECT_DOUBLE_EQ(sliced->get(3).y, 4.0);
     EXPECT_DOUBLE_EQ(sliced->get(4).y, 5.0);
     delete sliced;
+
+    Sequence<Point<double>> *emptied = spline.slice(0, spline.get_count());
+    EXPECT_EQ(emptied->get_count(), 0);
+    delete emptied;
+}
+
+TEST(CubicSplineSequenceTest, ConcatSupportsTwoEmptySequences) {
+    MutableCubicSpline<double> left;
+    MutableCubicSpline<double> right;
+
+    Sequence<Point<double>> *joined = left.concat(&right);
+    EXPECT_EQ(joined->get_count(), 0);
+    delete joined;
 }

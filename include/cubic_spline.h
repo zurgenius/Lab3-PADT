@@ -3,8 +3,7 @@
 #include <concepts>
 #include <stdexcept>
 
-#include "dynamic_array.h"
-#include "sequence.h"
+#include "array_sequence.h"
 
 // Концепт алгебраической структуры упорядоченного поля.
 // С++20 чтобы удобно сузить тип T в шаблоне CubicSpline.
@@ -18,7 +17,13 @@ concept Field = requires(T a, T b) {
     { a < b } -> std::convertible_to<bool>;
     T{0};
     T{1};
-} && std::totally_ordered<T>;
+    T{2};
+} && std::totally_ordered<T> && requires {
+    requires(T{1} != T{0});
+    requires(T{1} / T{2} !=
+             T{0}); // отбрасываем int-like для которых деление отбрасывает дробную часть
+};
+;
 
 // Точка (x, f(x)) для сплайн-узлов.
 template <Field T> struct Point {
@@ -26,6 +31,8 @@ template <Field T> struct Point {
     T y;
 };
 
+// Коэффициенты кубического полинома + границы куска для одного куска сплайна.
+// Используется для построения аналитического представления
 template <Field T> struct SplineSegment {
     T left_x;
     T right_x;
@@ -35,11 +42,26 @@ template <Field T> struct SplineSegment {
     T d;
 };
 
-// Кубический сплайн-интерполятор для упорядоченного поля T.
-template <Field T> class CubicSpline : public Sequence<Point<T>> {
+template <Field T> class CubicSpline : public ArraySequence<Point<T>> {
+  private:
+    DynamicArray<T> coef_a;
+    DynamicArray<T> coef_b;
+    DynamicArray<T> coef_c;
+    DynamicArray<T> coef_d;
+
+    void assign_nodes(const DynamicArray<Point<T>> &points);
+    void clear_coefficients();
+    void rebuild_or_take_raw();
+    void store_raw_points();
+
+    // Решение трёхдиагональной системы методом прогонки (Томаса).
+    void solve_tridiag(const DynamicArray<T> &lower_diag, const DynamicArray<T> &main_diag,
+                       const DynamicArray<T> &upper_diag, const DynamicArray<T> &rhs,
+                       DynamicArray<T> &solution);
+
   protected:
-    virtual CubicSpline<T> *Instance() = 0;
-    virtual CubicSpline<T> *EmptyClone() = 0;
+    virtual CubicSpline<T> *Instance() override = 0;
+    virtual CubicSpline<T> *EmptyClone() override = 0;
 
   public:
     CubicSpline();
@@ -56,16 +78,6 @@ template <Field T> class CubicSpline : public Sequence<Point<T>> {
     SplineSegment<T> get_segment(int index) const;
     Option<SplineSegment<T>> try_get_segment(int index) const;
 
-    const Point<T> &get_first() const override;
-    const Point<T> &get_last() const override;
-    const Point<T> &get(int index) const override;
-
-    Option<Point<T>> try_get_first() const override;
-    Option<Point<T>> try_get_last() const override;
-    Option<Point<T>> try_get(int index) const override;
-
-    int get_count() const override;
-
     Sequence<Point<T>> *get_sub_sequence(int start, int end) override;
 
     Sequence<Point<T>> *append(const Point<T> &item) override;
@@ -80,38 +92,6 @@ template <Field T> class CubicSpline : public Sequence<Point<T>> {
 
     Sequence<Point<T>> *slice(int index, int count,
                               const Sequence<Point<T>> *replace_seq = nullptr) override;
-
-    IEnumerator<Point<T>> *get_enumerator() const override;
-
-  private:
-    int nodes_count; // количество узлов
-    DynamicArray<Point<T>> nodes;
-    DynamicArray<T> coef_a;
-    DynamicArray<T> coef_b;
-    DynamicArray<T> coef_c;
-    DynamicArray<T> coef_d;
-
-    class Enumerator : public IEnumerator<Point<T>> {
-      private:
-        const Point<T> *data;
-        int size;
-        int index;
-
-      public:
-        Enumerator(const Point<T> *data, int size) : data(data), size(size), index(-1) {}
-
-        bool move_next() override {
-            index++;
-            return index < size;
-        }
-
-        const Point<T> &get_current() const override { return data[index]; }
-    };
-
-    void take_raw(const Point<T> *points, int n);
-
-    // Решение трёхдиагональной системы методом прогонки (Томаса).
-    void solve_tridiag(T **TDM, T *F, T *b);
 };
 
 template <Field T> class MutableCubicSpline : public CubicSpline<T> {

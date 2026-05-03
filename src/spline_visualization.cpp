@@ -26,9 +26,10 @@
 
 namespace {
 
-constexpr int kMinSplinePoints = 3;
-constexpr int kPlotSamples = 500;
+constexpr int kMinSplinePoints = 3; //сколько точек минимально должно быть введено юзером
+constexpr int kPlotSamples = 500;  //на сколько дискретных точек разбивается функция для отрисовки
 
+//данные графика
 struct PlotData {
     DynamicArray<double> node_x;
     DynamicArray<double> node_y;
@@ -187,6 +188,8 @@ bool add_point(MutableCubicSpline<double> &spline, const Point<double> &point, b
     return true;
 }
 
+
+//таблица точек
 void draw_points_table(const PlotData &data) {
     if (!ImGui::BeginTable("PointsTable", 3,
                            ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg |
@@ -212,6 +215,8 @@ void draw_points_table(const PlotData &data) {
     ImGui::EndTable();
 }
 
+
+//пишем уравнение кусочно заданной функции - кубического сплайна в аналитическом виде
 void draw_piecewise_system(const CubicSpline<double> &spline, bool spline_ready) {
     ImGui::TextUnformatted("Piecewise form");
     ImGui::Separator();
@@ -233,7 +238,7 @@ void draw_piecewise_system(const CubicSpline<double> &spline, bool spline_ready)
     ImGui::Unindent();
 }
 
-} // namespace
+} // namespace, закрыть функции от внешнего использование, аналог static в С
 
 void menu_spline_viewer() {
     std::cout << "\n=== Spline Viewer ===" << std::endl;
