@@ -51,7 +51,7 @@ template <Field T> class CubicSpline : public ArraySequence<Point<T>> {
 
     void assign_nodes(const DynamicArray<Point<T>> &points);
     void clear_coefficients();
-    void rebuild_or_take_raw();
+    void rebuild_or_store_raw();
     void store_raw_points();
 
     // Решение трёхдиагональной системы методом прогонки (Томаса).

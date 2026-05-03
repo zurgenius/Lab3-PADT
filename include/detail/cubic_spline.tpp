@@ -34,7 +34,7 @@ template <Field T> void CubicSpline<T>::clear_coefficients() {
 // обертка, как работаем с последовательностью
 // при кол-ве узлов >= 3 - строим сплайн, чтобы не терять состояние собранности при переделке
 // последовательности иначе просто храним узлы без построения
-template <Field T> void CubicSpline<T>::rebuild_or_take_raw() {
+template <Field T> void CubicSpline<T>::rebuild_or_store_raw() {
     if (this->count >= 3) {
         build(&this->array.get(0), this->count);
     } else {
@@ -196,42 +196,42 @@ template <Field T> Option<SplineSegment<T>> CubicSpline<T>::try_get_segment(int 
 template <Field T> Sequence<Point<T>> *CubicSpline<T>::get_sub_sequence(int start, int end) {
     Sequence<Point<T>> *result_seq = ArraySequence<Point<T>>::get_sub_sequence(start, end);
     CubicSpline<T> *result = static_cast<CubicSpline<T> *>(result_seq);
-    result->rebuild_or_take_raw();
+    result->rebuild_or_store_raw();
     return result;
 }
 
 template <Field T> Sequence<Point<T>> *CubicSpline<T>::append(const Point<T> &item) {
     Sequence<Point<T>> *target_seq = ArraySequence<Point<T>>::append(item);
     CubicSpline<T> *target = static_cast<CubicSpline<T> *>(target_seq);
-    target->rebuild_or_take_raw();
+    target->rebuild_or_store_raw();
     return target;
 }
 
 template <Field T> Sequence<Point<T>> *CubicSpline<T>::prepend(const Point<T> &item) {
     Sequence<Point<T>> *target_seq = ArraySequence<Point<T>>::prepend(item);
     CubicSpline<T> *target = static_cast<CubicSpline<T> *>(target_seq);
-    target->rebuild_or_take_raw();
+    target->rebuild_or_store_raw();
     return target;
 }
 
 template <Field T> Sequence<Point<T>> *CubicSpline<T>::insert_at(const Point<T> &item, int index) {
     Sequence<Point<T>> *target_seq = ArraySequence<Point<T>>::insert_at(item, index);
     CubicSpline<T> *target = static_cast<CubicSpline<T> *>(target_seq);
-    target->rebuild_or_take_raw();
+    target->rebuild_or_store_raw();
     return target;
 }
 
 template <Field T> Sequence<Point<T>> *CubicSpline<T>::concat(const Sequence<Point<T>> *other) {
     Sequence<Point<T>> *result_seq = ArraySequence<Point<T>>::concat(other);
     CubicSpline<T> *result = static_cast<CubicSpline<T> *>(result_seq);
-    result->rebuild_or_take_raw();
+    result->rebuild_or_store_raw();
     return result;
 }
 
 template <Field T> Sequence<Point<T>> *CubicSpline<T>::map(Point<T> (*func)(const Point<T> &elem)) {
     Sequence<Point<T>> *result_seq = ArraySequence<Point<T>>::map(func);
     CubicSpline<T> *result = static_cast<CubicSpline<T> *>(result_seq);
-    result->rebuild_or_take_raw();
+    result->rebuild_or_store_raw();
     return result;
 }
 
@@ -239,7 +239,7 @@ template <Field T>
 Sequence<Point<T>> *CubicSpline<T>::where(bool (*predicate)(const Point<T> &elem)) {
     Sequence<Point<T>> *result_seq = ArraySequence<Point<T>>::where(predicate);
     CubicSpline<T> *result = static_cast<CubicSpline<T> *>(result_seq);
-    result->rebuild_or_take_raw();
+    result->rebuild_or_store_raw();
     return result;
 }
 
@@ -255,6 +255,6 @@ Sequence<Point<T>> *CubicSpline<T>::slice(int index, int count,
                                           const Sequence<Point<T>> *replace_seq) {
     Sequence<Point<T>> *result_seq = ArraySequence<Point<T>>::slice(index, count, replace_seq);
     CubicSpline<T> *result = static_cast<CubicSpline<T> *>(result_seq);
-    result->rebuild_or_take_raw();
+    result->rebuild_or_store_raw();
     return result;
 }
