@@ -4,7 +4,6 @@
 #include <cmath>
 #include <cstdlib>
 #include <iostream>
-#include <memory>
 #include <stdexcept>
 #include <string>
 
@@ -104,7 +103,7 @@ bool parse_point_input(const char *x_text, const char *y_text, Point<double> &po
            parse_double_value(y_text, "Y", point.y, message);
 }
 
-bool rebuild_spline(CubicSpline<double> &spline, std::string &message) {
+bool rebuild_spline(MutableCubicSpline<double> &spline, std::string &message) {
     const int count = spline.get_count();
     if (count < kMinSplinePoints) {
         message = "Add at least three points before building the spline";
@@ -131,7 +130,7 @@ bool rebuild_spline(CubicSpline<double> &spline, std::string &message) {
     return true;
 }
 
-bool refresh_plot(CubicSpline<double> &spline, PlotData &data, std::string &message) {
+bool refresh_plot(MutableCubicSpline<double> &spline, PlotData &data, std::string &message) {
     collect_nodes(spline, data);
     data.spline_x.resize(0);
     data.spline_y.resize(0);
@@ -159,7 +158,7 @@ bool refresh_plot(CubicSpline<double> &spline, PlotData &data, std::string &mess
     return true;
 }
 
-bool add_point(CubicSpline<double> &spline, const Point<double> &point, bool to_beginning,
+bool add_point(MutableCubicSpline<double> &spline, const Point<double> &point, bool to_beginning,
                std::string &message) {
     if (to_beginning) {
         if (!is_valid_prepend(spline, point, message)) {
@@ -213,13 +212,33 @@ void draw_points_table(const PlotData &data) {
     ImGui::EndTable();
 }
 
+void draw_piecewise_system(const CubicSpline<double> &spline, bool spline_ready) {
+    ImGui::TextUnformatted("Piecewise form");
+    ImGui::Separator();
+
+    if (!spline_ready) {
+        ImGui::TextWrapped("Build a spline from at least three points to see polynomial segments.");
+        return;
+    }
+
+    ImGui::TextUnformatted("S(x) =");
+    ImGui::Indent();
+    for (int index = 0; index < spline.get_segment_count(); ++index) {
+        const SplineSegment<double> segment = spline.get_segment(index);
+        ImGui::TextWrapped(
+            "%.6g + %.6g(x - %.6g) + %.6g(x - %.6g)^2 + %.6g(x - %.6g)^3, %.6g <= x <= %.6g",
+            segment.a, segment.b, segment.left_x, segment.c, segment.left_x, segment.d,
+            segment.left_x, segment.left_x, segment.right_x);
+    }
+    ImGui::Unindent();
+}
+
 } // namespace
 
 void menu_spline_viewer() {
     std::cout << "\n=== Spline Viewer ===" << std::endl;
     std::cout << "Launching graphical window..." << std::endl;
 
-    std::unique_ptr<CubicSpline<double>> spline = std::make_unique<CubicSpline<double>>();
     PlotData data;
     std::string status = "Create a point sequence";
     char input_x[64] = "0";
@@ -254,6 +273,8 @@ void menu_spline_viewer() {
     ImPlot::CreateContext();
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(glsl_version);
+
+    MutableCubicSpline<double> *spline = new MutableCubicSpline<double>();
 
     // Главный цикл окна
     while (!glfwWindowShouldClose(window)) {
@@ -300,7 +321,8 @@ void menu_spline_viewer() {
             }
         }
         if (ImGui::Button("Clear", ImVec2(-1.0f, 0.0f))) {
-            spline = std::make_unique<CubicSpline<double>>();
+            delete spline;
+            spline = new MutableCubicSpline<double>();
             clear_plot_data(data);
             spline_ready = false;
             status = "Create a point sequence";
@@ -314,8 +336,13 @@ void menu_spline_viewer() {
 
         ImGui::SameLine();
 
-        ImGui::BeginChild("Plot", ImVec2(0.0f, 0.0f), false);
-        if (ImPlot::BeginPlot("Spline interpolation", ImVec2(-1.0f, -1.0f))) {
+        ImGui::BeginChild("PlotAndFormula", ImVec2(0.0f, 0.0f), false);
+        float plot_height = ImGui::GetContentRegionAvail().y * 0.58f;
+        if (plot_height < 220.0f) {
+            plot_height = 220.0f;
+        }
+
+        if (ImPlot::BeginPlot("Spline interpolation", ImVec2(-1.0f, plot_height))) {
             ImPlot::SetupAxes("x", "y");
             if (spline_ready && data.spline_x.get_size() > 0) {
                 ImPlot::PlotLine("Spline", &data.spline_x.get(0), &data.spline_y.get(0),
@@ -328,6 +355,11 @@ void menu_spline_viewer() {
             }
             ImPlot::EndPlot();
         }
+
+        ImGui::Spacing();
+        ImGui::BeginChild("PiecewiseSystem", ImVec2(0.0f, 0.0f), true);
+        draw_piecewise_system(*spline, spline_ready);
+        ImGui::EndChild();
         ImGui::EndChild();
         ImGui::End();
 
@@ -349,5 +381,6 @@ void menu_spline_viewer() {
     ImGui::DestroyContext();
     glfwDestroyWindow(window);
     glfwTerminate();
+    delete spline;
     std::cout << "Graphical window closed. Returning to menu." << std::endl;
 }
