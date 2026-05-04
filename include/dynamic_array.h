@@ -12,6 +12,7 @@ template <class T> class DynamicArray {
     explicit DynamicArray(int size);
     DynamicArray(const T *items, int count);
     DynamicArray(const DynamicArray<T> &other);
+    DynamicArray<T> &operator=(const DynamicArray<T> &other);
 
     const T &get(int index) const;
     const T &operator[](int index) const;

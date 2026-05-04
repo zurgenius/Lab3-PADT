@@ -4,245 +4,160 @@
 #include <gtest/gtest.h>
 #include <stdexcept>
 
-Point<double> add_one(const Point<double> &value) {
-    Point<double> result{value.x, value.y + 1.0};
-    return result;
+namespace {
+
+class TestInterpolator : public Interpolator<double> {
+  public:
+    Sequence<FunctionSegment<double>> *
+    interpolate(const Sequence<Point<double>> & /*points*/) const override {
+        return new MutableArraySequence<FunctionSegment<double>>();
+    }
+};
+
+FunctionSegment<double> make_segment(double left, double right, const double *coefficients,
+                                     int coefficient_count) {
+    return FunctionSegment<double>{left, right,
+                                   DynamicArray<double>(coefficients, coefficient_count)};
 }
 
-bool is_positive_double(const Point<double> &value) { return value.y > 0.0; }
-bool is_large_double(const Point<double> &value) { return value.y > 100.0; }
+} // namespace
 
-Point<double> sum_double(const Point<double> &left, const Point<double> &right) {
-    Point<double> result{left.x, left.y + right.y};
-    return result;
+TEST(InterpolatorEvaluateTest, ReturnsNoneForEmptySegments) {
+    TestInterpolator interpolator;
+    MutableArraySequence<FunctionSegment<double>> segments;
+
+    const Option<double> value = interpolator.evaluate(segments, 1.0);
+
+    EXPECT_FALSE(value.has_value());
 }
 
-TEST(CubicSplineTest, BuildThrowsWhenTooFewPoints) {
-    Point<double> points[] = {{0.0, 0.0}, {1.0, 1.0}};
-    MutableCubicSpline<double> spline;
+TEST(InterpolatorEvaluateTest, ReturnsNoneOutsideDomain) {
+    TestInterpolator interpolator;
+    double coefficients[] = {1.0};
+    FunctionSegment<double> segment_items[] = {make_segment(0.0, 1.0, coefficients, 1)};
+    MutableArraySequence<FunctionSegment<double>> segments(segment_items, 1);
 
-    EXPECT_THROW(spline.build(points, 2), std::invalid_argument);
+    EXPECT_FALSE(interpolator.evaluate(segments, -0.1).has_value());
+    EXPECT_FALSE(interpolator.evaluate(segments, 1.1).has_value());
 }
 
-TEST(CubicSplineTest, EvaluateMatchesNodesForLinearFunction) {
-    Point<double> points[] = {{0.0, 1.0}, {1.0, 3.0}, {2.0, 5.0}, {3.0, 7.0}};
-    MutableCubicSpline<double> spline;
+TEST(InterpolatorEvaluateTest, SelectsSegmentWithBinarySearchAndLeftBoundaryRule) {
+    TestInterpolator interpolator;
+    double left_coefficients[] = {10.0, 1.0};
+    double right_coefficients[] = {100.0, 10.0};
+    FunctionSegment<double> segment_items[] = {
+        make_segment(0.0, 1.0, left_coefficients, 2),
+        make_segment(1.0, 2.0, right_coefficients, 2),
+    };
+    MutableArraySequence<FunctionSegment<double>> segments(segment_items, 2);
 
-    spline.build(points, 4);
+    const Option<double> boundary = interpolator.evaluate(segments, 1.0);
+    const Option<double> middle = interpolator.evaluate(segments, 1.5);
 
-    EXPECT_NEAR(spline.evaluate(0.0), 1.0, 1e-12);
-    EXPECT_NEAR(spline.evaluate(1.0), 3.0, 1e-12);
-    EXPECT_NEAR(spline.evaluate(2.0), 5.0, 1e-12);
-    EXPECT_NEAR(spline.evaluate(3.0), 7.0, 1e-12);
+    ASSERT_TRUE(boundary.has_value());
+    ASSERT_TRUE(middle.has_value());
+    EXPECT_DOUBLE_EQ(boundary.get_value(), 11.0);
+    EXPECT_DOUBLE_EQ(middle.get_value(), 105.0);
 }
 
-TEST(CubicSplineTest, EvaluateMatchesLinearFunctionBetweenNodes) {
-    Point<double> points[] = {{0.0, 1.0}, {1.0, 3.0}, {2.0, 5.0}, {3.0, 7.0}};
-    MutableCubicSpline<double> spline;
+TEST(InterpolatorEvaluateTest, EvaluatesPolynomialOfAnyDegreeRelativeToLeftBoundary) {
+    TestInterpolator interpolator;
+    double coefficients[] = {1.0, 2.0, 3.0, 4.0};
+    FunctionSegment<double> segment_items[] = {make_segment(2.0, 4.0, coefficients, 4)};
+    MutableArraySequence<FunctionSegment<double>> segments(segment_items, 1);
 
-    spline.build(points, 4);
+    const Option<double> value = interpolator.evaluate(segments, 3.0);
 
-    EXPECT_NEAR(spline.evaluate(0.5), 2.0, 1e-12);
-    EXPECT_NEAR(spline.evaluate(1.5), 4.0, 1e-12);
-    EXPECT_NEAR(spline.evaluate(2.5), 6.0, 1e-12);
+    ASSERT_TRUE(value.has_value());
+    EXPECT_DOUBLE_EQ(value.get_value(), 10.0);
 }
 
-TEST(CubicSplineTest, GetSegmentCountReturnsZeroBeforeBuild) {
-    MutableCubicSpline<double> spline;
+TEST(CubicSplineInterpolatorTest, InterpolateThrowsWhenTooFewPoints) {
+    Point<double> point_items[] = {{0.0, 0.0}, {1.0, 1.0}};
+    MutableArraySequence<Point<double>> points(point_items, 2);
+    CubicSplineInterpolator<double> interpolator;
 
-    EXPECT_EQ(spline.get_segment_count(), 0);
+    EXPECT_THROW(interpolator.interpolate(points), std::invalid_argument);
 }
 
-TEST(CubicSplineTest, GetSegmentReturnsPolynomialCoefficients) {
-    Point<double> points[] = {{0.0, 1.0}, {1.0, 3.0}, {2.0, 5.0}, {3.0, 7.0}};
-    MutableCubicSpline<double> spline;
+TEST(CubicSplineInterpolatorTest, InterpolateThrowsWhenXValuesAreNotIncreasing) {
+    Point<double> equal_x_items[] = {{0.0, 0.0}, {1.0, 1.0}, {1.0, 2.0}};
+    Point<double> descending_x_items[] = {{0.0, 0.0}, {2.0, 1.0}, {1.0, 2.0}};
+    MutableArraySequence<Point<double>> equal_x_points(equal_x_items, 3);
+    MutableArraySequence<Point<double>> descending_x_points(descending_x_items, 3);
+    CubicSplineInterpolator<double> interpolator;
 
-    spline.build(points, 4);
-
-    EXPECT_EQ(spline.get_segment_count(), 3);
-
-    const SplineSegment<double> first = spline.get_segment(0);
-    EXPECT_DOUBLE_EQ(first.left_x, 0.0);
-    EXPECT_DOUBLE_EQ(first.right_x, 1.0);
-    EXPECT_DOUBLE_EQ(first.a, 1.0);
-    EXPECT_DOUBLE_EQ(first.b, 2.0);
-    EXPECT_DOUBLE_EQ(first.c, 0.0);
-    EXPECT_DOUBLE_EQ(first.d, 0.0);
-
-    const SplineSegment<double> second = spline.get_segment(1);
-    EXPECT_DOUBLE_EQ(second.left_x, 1.0);
-    EXPECT_DOUBLE_EQ(second.right_x, 2.0);
-    EXPECT_DOUBLE_EQ(second.a, 3.0);
-    EXPECT_DOUBLE_EQ(second.b, 2.0);
-    EXPECT_DOUBLE_EQ(second.c, 0.0);
-    EXPECT_DOUBLE_EQ(second.d, 0.0);
+    EXPECT_THROW(interpolator.interpolate(equal_x_points), std::invalid_argument);
+    EXPECT_THROW(interpolator.interpolate(descending_x_points), std::invalid_argument);
 }
 
-TEST(CubicSplineTest, TryGetSegmentReturnsNoneForInvalidIndex) {
-    Point<double> points[] = {{0.0, 1.0}, {1.0, 3.0}, {2.0, 5.0}, {3.0, 7.0}};
-    MutableCubicSpline<double> spline;
+TEST(CubicSplineInterpolatorTest, CreatesOneSegmentBetweenEachPairOfPoints) {
+    Point<double> point_items[] = {{0.0, 1.0}, {1.0, 3.0}, {2.0, 5.0}, {3.0, 7.0}};
+    MutableArraySequence<Point<double>> points(point_items, 4);
+    CubicSplineInterpolator<double> interpolator;
 
-    spline.build(points, 4);
+    Sequence<FunctionSegment<double>> *segments = interpolator.interpolate(points);
 
-    EXPECT_FALSE(spline.try_get_segment(-1).has_value());
-    EXPECT_FALSE(spline.try_get_segment(3).has_value());
-    EXPECT_THROW(spline.get_segment(3), std::out_of_range);
+    ASSERT_EQ(segments->get_count(), 3);
+    EXPECT_DOUBLE_EQ(segments->get(0).left, 0.0);
+    EXPECT_DOUBLE_EQ(segments->get(0).right, 1.0);
+    EXPECT_DOUBLE_EQ(segments->get(1).left, 1.0);
+    EXPECT_DOUBLE_EQ(segments->get(1).right, 2.0);
+    EXPECT_DOUBLE_EQ(segments->get(2).left, 2.0);
+    EXPECT_DOUBLE_EQ(segments->get(2).right, 3.0);
+    delete segments;
 }
 
-TEST(CubicSplineTest, ImmutableAppendReturnsNewSpline) {
-    Point<double> points[] = {{0.0, 1.0}, {1.0, 2.0}, {2.0, 3.0}};
-    ImmutableCubicSpline<double> spline;
+TEST(CubicSplineInterpolatorTest, EvaluatedSplinePassesThroughSourcePoints) {
+    Point<double> point_items[] = {{0.0, 1.0}, {1.0, 3.0}, {2.0, 5.0}, {3.0, 7.0}};
+    MutableArraySequence<Point<double>> points(point_items, 4);
+    CubicSplineInterpolator<double> interpolator;
 
-    spline.build(points, 3);
+    Sequence<FunctionSegment<double>> *segments = interpolator.interpolate(points);
 
-    Sequence<Point<double>> *updated = spline.append(Point<double>{3.0, 4.0});
-    EXPECT_EQ(spline.get_count(), 3);
-    EXPECT_EQ(updated->get_count(), 4);
-    EXPECT_DOUBLE_EQ(spline.get_last().y, 3.0);
-    EXPECT_DOUBLE_EQ(updated->get_last().y, 4.0);
-    delete updated;
+    for (int index = 0; index < points.get_count(); ++index) {
+        const Option<double> value = interpolator.evaluate(*segments, points.get(index).x);
+        ASSERT_TRUE(value.has_value());
+        EXPECT_NEAR(value.get_value(), points.get(index).y, 1e-12);
+    }
+    delete segments;
 }
 
-TEST(CubicSplineSequenceTest, AccessorsReturnFValues) {
-    Point<double> points[] = {{0.0, 1.0}, {1.0, 2.0}, {2.0, 3.0}};
-    MutableCubicSpline<double> spline;
+TEST(CubicSplineInterpolatorTest, LinearFunctionProducesLinearSegments) {
+    Point<double> point_items[] = {{0.0, 1.0}, {1.0, 3.0}, {2.0, 5.0}, {3.0, 7.0}};
+    MutableArraySequence<Point<double>> points(point_items, 4);
+    CubicSplineInterpolator<double> interpolator;
 
-    spline.build(points, 3);
+    Sequence<FunctionSegment<double>> *segments = interpolator.interpolate(points);
 
-    Sequence<Point<double>> *seq = &spline;
-    EXPECT_EQ(seq->get_count(), 3);
-    EXPECT_DOUBLE_EQ(seq->get_first().y, 1.0);
-    EXPECT_DOUBLE_EQ(seq->get_last().y, 3.0);
-    EXPECT_DOUBLE_EQ(seq->get(1).y, 2.0);
-    EXPECT_TRUE(seq->try_get_first().has_value());
-    EXPECT_DOUBLE_EQ(seq->try_get(1).get_value().y, 2.0);
+    ASSERT_EQ(segments->get_count(), 3);
+    for (int index = 0; index < segments->get_count(); ++index) {
+        const FunctionSegment<double> &segment = segments->get(index);
+        ASSERT_EQ(segment.coefficients.get_size(), 4);
+        EXPECT_NEAR(segment.coefficients.get(0), 1.0 + 2.0 * segment.left, 1e-12);
+        EXPECT_NEAR(segment.coefficients.get(1), 2.0, 1e-12);
+        EXPECT_NEAR(segment.coefficients.get(2), 0.0, 1e-12);
+        EXPECT_NEAR(segment.coefficients.get(3), 0.0, 1e-12);
+    }
+    delete segments;
 }
 
-TEST(CubicSplineSequenceTest, AppendAddsValueToEnd) {
-    Point<double> points[] = {{0.0, 1.0}, {1.0, 2.0}, {2.0, 3.0}};
-    MutableCubicSpline<double> spline;
+TEST(CubicSplineInterpolatorTest, EvaluatesLinearFunctionBetweenNodes) {
+    Point<double> point_items[] = {{0.0, 1.0}, {1.0, 3.0}, {2.0, 5.0}, {3.0, 7.0}};
+    MutableArraySequence<Point<double>> points(point_items, 4);
+    CubicSplineInterpolator<double> interpolator;
 
-    spline.build(points, 3);
-    Point<double> appended{3.0, 4.0};
-    spline.append(appended);
+    Sequence<FunctionSegment<double>> *segments = interpolator.interpolate(points);
 
-    EXPECT_EQ(spline.get_count(), 4);
-    EXPECT_DOUBLE_EQ(spline.get_last().y, 4.0);
-    EXPECT_DOUBLE_EQ(spline.get(3).y, 4.0);
-}
+    const Option<double> first = interpolator.evaluate(*segments, 0.5);
+    const Option<double> second = interpolator.evaluate(*segments, 1.5);
+    const Option<double> third = interpolator.evaluate(*segments, 2.5);
 
-TEST(CubicSplineSequenceTest, PrependAddsValueToStart) {
-    Point<double> points[] = {{0.0, 1.0}, {1.0, 2.0}, {2.0, 3.0}};
-    MutableCubicSpline<double> spline;
-
-    spline.build(points, 3);
-    Point<double> prepended{-1.0, 0.0};
-    spline.prepend(prepended);
-
-    EXPECT_EQ(spline.get_count(), 4);
-    EXPECT_DOUBLE_EQ(spline.get_first().y, 0.0);
-    EXPECT_DOUBLE_EQ(spline.get(1).y, 1.0);
-}
-
-TEST(CubicSplineSequenceTest, InsertAtAddsValueInMiddle) {
-    Point<double> points[] = {{0.0, 1.0}, {1.0, 2.0}, {2.0, 3.0}};
-    MutableCubicSpline<double> spline;
-
-    spline.build(points, 3);
-    Point<double> inserted{0.5, 1.5};
-    spline.insert_at(inserted, 1);
-
-    EXPECT_EQ(spline.get_count(), 4);
-    EXPECT_DOUBLE_EQ(spline.get(1).y, 1.5);
-    EXPECT_DOUBLE_EQ(spline.get(2).y, 2.0);
-}
-
-TEST(CubicSplineSequenceTest, InsertAtAllowsBoundaryIndex) {
-    Point<double> points[] = {{0.0, 1.0}, {1.0, 2.0}, {2.0, 3.0}};
-    MutableCubicSpline<double> spline;
-
-    spline.build(points, 3);
-    spline.insert_at(Point<double>{3.0, 4.0}, spline.get_count());
-
-    EXPECT_EQ(spline.get_count(), 4);
-    EXPECT_DOUBLE_EQ(spline.get_last().x, 3.0);
-    EXPECT_DOUBLE_EQ(spline.get_last().y, 4.0);
-}
-
-TEST(CubicSplineSequenceTest, MapWhereReduceWorkOnSpline) {
-    Point<double> points[] = {{0.0, 1.0}, {1.0, -2.0}, {2.0, 3.0}, {3.0, -4.0}};
-    MutableCubicSpline<double> spline;
-
-    spline.build(points, 4);
-
-    Sequence<Point<double>> *mapped = spline.map(add_one);
-    EXPECT_DOUBLE_EQ(mapped->get(0).y, 2.0);
-    EXPECT_DOUBLE_EQ(mapped->get(1).y, -1.0);
-    delete mapped;
-
-    Sequence<Point<double>> *filtered = spline.where(is_positive_double);
-    EXPECT_EQ(filtered->get_count(), 2);
-    EXPECT_DOUBLE_EQ(filtered->get(0).y, 1.0);
-    EXPECT_DOUBLE_EQ(filtered->get(1).y, 3.0);
-    delete filtered;
-
-    Sequence<Point<double>> *empty_filtered = spline.where(is_large_double);
-    EXPECT_EQ(empty_filtered->get_count(), 0);
-    delete empty_filtered;
-
-    Point<double> reduced = spline.reduce(sum_double, Point<double>{0.0, 0.0});
-    EXPECT_DOUBLE_EQ(reduced.y, -2.0);
-}
-
-TEST(CubicSplineSequenceTest, ConcatCreatesCombinedSequence) {
-    Point<double> left_points[] = {{0.0, 1.0}, {1.0, 2.0}, {2.0, 3.0}};
-    Point<double> right_points[] = {{0.0, 4.0}, {1.0, 5.0}, {2.0, 6.0}};
-    MutableCubicSpline<double> left;
-    MutableCubicSpline<double> right;
-
-    left.build(left_points, 3);
-    right.build(right_points, 3);
-
-    Sequence<Point<double>> *joined = left.concat(&right);
-    EXPECT_EQ(joined->get_count(), 6);
-    EXPECT_DOUBLE_EQ(joined->get(2).y, 3.0);
-    EXPECT_DOUBLE_EQ(joined->get(3).y, 4.0);
-    delete joined;
-}
-
-TEST(CubicSplineSequenceTest, SubSequenceAndSliceFollowSequenceRules) {
-    Point<double> points[] = {{0.0, 1.0}, {1.0, 2.0}, {2.0, 3.0}, {3.0, 4.0}, {4.0, 5.0}};
-    MutableCubicSpline<double> spline;
-
-    spline.build(points, 5);
-
-    Sequence<Point<double>> *subseq = spline.get_sub_sequence(1, 3);
-    EXPECT_EQ(subseq->get_count(), 3);
-    EXPECT_DOUBLE_EQ(subseq->get(0).y, 2.0);
-    EXPECT_DOUBLE_EQ(subseq->get(2).y, 4.0);
-    delete subseq;
-
-    Point<double> replacement_items[] = {{1.5, 8.0}, {2.5, 9.0}};
-    MutableArraySequence<Point<double>> replacement(replacement_items, 2);
-    Sequence<Point<double>> *sliced = spline.slice(1, 2, &replacement);
-    EXPECT_EQ(sliced->get_count(), 5);
-    EXPECT_DOUBLE_EQ(sliced->get(0).y, 1.0);
-    EXPECT_DOUBLE_EQ(sliced->get(1).y, 8.0);
-    EXPECT_DOUBLE_EQ(sliced->get(2).y, 9.0);
-    EXPECT_DOUBLE_EQ(sliced->get(3).y, 4.0);
-    EXPECT_DOUBLE_EQ(sliced->get(4).y, 5.0);
-    delete sliced;
-
-    Sequence<Point<double>> *emptied = spline.slice(0, spline.get_count());
-    EXPECT_EQ(emptied->get_count(), 0);
-    delete emptied;
-}
-
-TEST(CubicSplineSequenceTest, ConcatSupportsTwoEmptySequences) {
-    MutableCubicSpline<double> left;
-    MutableCubicSpline<double> right;
-
-    Sequence<Point<double>> *joined = left.concat(&right);
-    EXPECT_EQ(joined->get_count(), 0);
-    delete joined;
+    ASSERT_TRUE(first.has_value());
+    ASSERT_TRUE(second.has_value());
+    ASSERT_TRUE(third.has_value());
+    EXPECT_NEAR(first.get_value(), 2.0, 1e-12);
+    EXPECT_NEAR(second.get_value(), 4.0, 1e-12);
+    EXPECT_NEAR(third.get_value(), 6.0, 1e-12);
+    delete segments;
 }

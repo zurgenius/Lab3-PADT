@@ -1,3 +1,5 @@
 #pragma once
 
-void menu_spline_viewer();
+#include "interpolator.h"
+
+void menu_spline_viewer(Interpolator<double> &interpolator);
