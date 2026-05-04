@@ -1,7 +1,6 @@
 #include "menu.h"
 
 #include "array_sequence.h"
-#include "cubic_spline.h"
 #include "list_sequence.h"
 #include "spline_visualization.h"
 #include "utils.h"
@@ -13,8 +12,6 @@ const int kMaxSequences = 10;
 
 Sequence<int> *sequences[kMaxSequences];
 int sequence_count = 0;
-
-CubicSplineInterpolator<double> interpolator;
 
 bool store_sequence(Sequence<int> *sequence) {
     if (sequence_count >= kMaxSequences) {
@@ -367,9 +364,9 @@ void run_menu() {
         case 11:
             menu_run_tests();
             break;
-        case 12: {
-            menu_spline_viewer(interpolator);
-        } break;
+        case 12:
+            menu_spline_viewer();
+            break;
         case 0:
             break;
         default:
