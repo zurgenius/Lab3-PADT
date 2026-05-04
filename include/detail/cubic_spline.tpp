@@ -41,6 +41,7 @@ CubicSplineInterpolator<T>::interpolate(const Sequence<Point<T>> &points) const 
             "CubicSplineInterpolator::interpolate: at least 3 points required");
     }
 
+    // вычисление h_i и delta_i
     DynamicArray<T> delta(count - 1);
     DynamicArray<T> h(count - 1);
     for (int index = 0; index < count - 1; ++index) {
@@ -53,6 +54,8 @@ CubicSplineInterpolator<T>::interpolate(const Sequence<Point<T>> &points) const 
         delta.set(index, (points.get(index + 1).y - points.get(index).y) / segment_width);
     }
 
+    // построение трёхдиагональной системы Am = F
+    //  здесь неизвестные - вторые производные в узлах
     DynamicArray<T> lower_diag(count);
     DynamicArray<T> main_diag(count);
     DynamicArray<T> upper_diag(count);
@@ -70,6 +73,9 @@ CubicSplineInterpolator<T>::interpolate(const Sequence<Point<T>> &points) const 
     main_diag.set(0, T{1});
     main_diag.set(count - 1, T{1});
 
+    // в этом цикле строим уравнение для внутренних узлов; для крайних задаём m[0] = m[n-1] = 0
+    // (естественный сплайн)
+    // такое уравнение гарантирует непрерывность первой производной в узлах
     for (int index = 1; index < count - 1; ++index) {
         lower_diag.set(index, h.get(index - 1));
         main_diag.set(index, T{2} * (h.get(index - 1) + h.get(index)));
@@ -77,11 +83,14 @@ CubicSplineInterpolator<T>::interpolate(const Sequence<Point<T>> &points) const 
         f_vec.set(index, T{6} * (delta.get(index) - delta.get(index - 1)));
     }
 
+    // решение системы методом прогонки (Томаса)
     solve_tridiag(lower_diag, main_diag, upper_diag, f_vec, m, count);
 
+    // вычисление коэффициентов сплайна
     MutableArraySequence<FunctionSegment<T>> *segments =
         new MutableArraySequence<FunctionSegment<T>>();
 
+    // считаем коэффициенты полинома для каждого куска
     for (int index = 0; index < count - 1; ++index) {
         DynamicArray<T> coefficients(4);
         coefficients.set(0, points.get(index).y);

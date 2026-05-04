@@ -5,6 +5,7 @@
 #include "array_sequence.h"
 
 // Концепт алгебраической структуры упорядоченного поля.
+// С++20 чтобы удобно сузить тип T в шаблоне.
 template <typename T>
 concept Field = requires(T a, T b) {
     { a + b } -> std::same_as<T>;

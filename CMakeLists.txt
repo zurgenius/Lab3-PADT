@@ -54,8 +54,8 @@ include(GoogleTest)
 
 add_executable(lab2_tests
     tests/array_sequence_tests.cpp
-    tests/cubic_spline_tests.cpp
     tests/dynamic_array_tests.cpp
+    tests/interpolator_tests.cpp
     tests/linked_list_tests.cpp
     tests/list_sequence_tests.cpp
 )

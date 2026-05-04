@@ -5,6 +5,7 @@
 template <Field T>
 Option<T> Interpolator<T>::evaluate(const Sequence<FunctionSegment<T>> &segments,
                                     const T &x) const {
+    // бин поиск сегмента которому принадлежит x
     const int count = segments.get_count();
     if (count == 0) {
         return Option<T>::None();
@@ -41,6 +42,8 @@ Option<T> Interpolator<T>::evaluate(const Sequence<FunctionSegment<T>> &segments
         return Option<T>::None();
     }
 
+    // считаем значени полинома для этого x в выбранном сегменте
+    // по схеме Горнера
     const FunctionSegment<T> &segment = segments.get(segment_index);
     const int coefficient_count = segment.coefficients.get_size();
     if (coefficient_count == 0) {
