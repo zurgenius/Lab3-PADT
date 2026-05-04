@@ -195,6 +195,33 @@ bool add_point(MutableArraySequence<Point<double>> &points, const Point<double> 
     return true;
 }
 
+bool add_point_sorted(MutableArraySequence<Point<double>> &points, const Point<double> &point,
+                      Interpolator<double> &interpolator,
+                      Sequence<FunctionSegment<double>> *&segments, std::string &message) {
+    int insert_index = 0;
+    while (insert_index < points.get_count() && points.get(insert_index).x < point.x) {
+        ++insert_index;
+    }
+
+    if (insert_index < points.get_count() && points.get(insert_index).x == point.x) {
+        message = "Point X values must be unique";
+        return false;
+    }
+
+    try {
+        points.insert_at(point, insert_index);
+        message = "Point added from plot";
+    } catch (const std::exception &error) {
+        message = error.what();
+        return false;
+    }
+
+    if (points.get_count() >= kMinSplinePoints) {
+        return rebuild_spline(points, interpolator, segments, message);
+    }
+    return true;
+}
+
 // таблица точек
 void draw_points_table(const PlotData &data) {
     if (!ImGui::BeginTable("PointsTable", 3,
@@ -380,6 +407,13 @@ void menu_spline_viewer(Interpolator<double> &interpolator) {
 
         if (ImPlot::BeginPlot("Spline interpolation", ImVec2(-1.0f, plot_height))) {
             ImPlot::SetupAxes("x", "y");
+            if (ImPlot::IsPlotHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+                const ImPlotPoint mouse_position = ImPlot::GetPlotMousePos();
+                const Point<double> point{mouse_position.x, mouse_position.y};
+                if (add_point_sorted(*points, point, interpolator, segments, status)) {
+                    spline_ready = refresh_plot(*points, interpolator, segments, data, status);
+                }
+            }
             if (spline_ready && data.spline_x.get_size() > 0) {
                 ImPlot::PlotLine("Spline", &data.spline_x.get(0), &data.spline_y.get(0),
                                  data.spline_x.get_size());
