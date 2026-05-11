@@ -33,7 +33,7 @@ void CubicSplineInterpolator<T>::solve_tridiag(const DynamicArray<T> &lower_diag
 }
 
 template <Field T>
-Sequence<FunctionSegment<T>> *
+Sequence<Function<T> *> *
 CubicSplineInterpolator<T>::interpolate(const Sequence<Point<T>> &points) const {
     const int count = points.get_count();
     if (count < 3) {
@@ -87,8 +87,7 @@ CubicSplineInterpolator<T>::interpolate(const Sequence<Point<T>> &points) const 
     solve_tridiag(lower_diag, main_diag, upper_diag, f_vec, m, count);
 
     // вычисление коэффициентов сплайна
-    MutableArraySequence<FunctionSegment<T>> *segments =
-        new MutableArraySequence<FunctionSegment<T>>();
+    MutableArraySequence<Function<T> *> *segments = new MutableArraySequence<Function<T> *>();
 
     // считаем коэффициенты полинома для каждого куска
     for (int index = 0; index < count - 1; ++index) {
@@ -99,7 +98,8 @@ CubicSplineInterpolator<T>::interpolate(const Sequence<Point<T>> &points) const 
         coefficients.set(2, m.get(index) / T{2});
         coefficients.set(3, (m.get(index + 1) - m.get(index)) / (T{6} * h.get(index)));
 
-        FunctionSegment<T> segment{points.get(index).x, points.get(index + 1).x, coefficients};
+        Function<T> *segment =
+            new PolynomialFunction<T>(points.get(index).x, points.get(index + 1).x, coefficients);
         segments->append(segment);
     }
 

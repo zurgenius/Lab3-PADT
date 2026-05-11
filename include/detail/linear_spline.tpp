@@ -5,7 +5,7 @@
 #include <stdexcept>
 
 template <Field T>
-Sequence<FunctionSegment<T>> *
+Sequence<Function<T> *> *
 LinearSplineInterpolator<T>::interpolate(const Sequence<Point<T>> &points) const {
     const int count = points.get_count();
     if (count < 2) {
@@ -13,8 +13,7 @@ LinearSplineInterpolator<T>::interpolate(const Sequence<Point<T>> &points) const
             "LinearSplineInterpolator::interpolate: at least 2 points required");
     }
 
-    MutableArraySequence<FunctionSegment<T>> *segments =
-        new MutableArraySequence<FunctionSegment<T>>();
+    MutableArraySequence<Function<T> *> *segments = new MutableArraySequence<Function<T> *>();
 
     for (int index = 0; index < count - 1; ++index) {
         const T segment_width = points.get(index + 1).x - points.get(index).x;
@@ -28,7 +27,8 @@ LinearSplineInterpolator<T>::interpolate(const Sequence<Point<T>> &points) const
         coefficients.set(0, points.get(index).y);
         coefficients.set(1, (points.get(index + 1).y - points.get(index).y) / segment_width);
 
-        FunctionSegment<T> segment{points.get(index).x, points.get(index + 1).x, coefficients};
+        Function<T> *segment =
+            new PolynomialFunction<T>(points.get(index).x, points.get(index + 1).x, coefficients);
         segments->append(segment);
     }
 

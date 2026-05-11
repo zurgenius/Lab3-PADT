@@ -2,6 +2,7 @@
 
 #include <stdexcept>
 
+#include "array_sequence.h"
 #include "interpolator.h"
 
 // пример конкретной реализации интерполятора - кубический сплайн
@@ -13,7 +14,7 @@ template <Field T> class CubicSplineInterpolator : public Interpolator<T> {
                        DynamicArray<T> &solution, int size) const;
 
   public:
-    Sequence<FunctionSegment<T>> *interpolate(const Sequence<Point<T>> &points) const override;
+    Sequence<Function<T> *> *interpolate(const Sequence<Point<T>> &points) const override;
 };
 
 #include "detail/cubic_spline.tpp"

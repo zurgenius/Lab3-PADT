@@ -3,33 +3,38 @@
 #include "interpolator.h"
 
 template <Field T>
-Option<T> Interpolator<T>::evaluate(const Sequence<FunctionSegment<T>> &segments,
-                                    const T &x) const {
+Option<T> Interpolator<T>::evaluate(const Sequence<Function<T> *> &segments, const T &x) const {
     // бин поиск сегмента которому принадлежит x
     const int count = segments.get_count();
     if (count == 0) {
         return Option<T>::None();
     }
 
-    const FunctionSegment<T> &first = segments.get_first();
-    const FunctionSegment<T> &last = segments.get_last();
-    if (x < first.left || x > last.right) {
+    const Function<T> *first = segments.get_first();
+    const Function<T> *last = segments.get_last();
+    if (first == nullptr || last == nullptr) {
+        return Option<T>::None();
+    }
+    if (x < first->get_left() || x > last->get_right()) {
         return Option<T>::None();
     }
 
     int segment_index = -1;
-    if (x == first.left) {
+    if (x == first->get_left()) {
         segment_index = 0;
     } else {
         int left = 0;
         int right = count - 1;
         while (left <= right) {
             const int mid = left + (right - left) / 2;
-            const FunctionSegment<T> &segment = segments.get(mid);
+            const Function<T> *segment = segments.get(mid);
+            if (segment == nullptr) {
+                return Option<T>::None();
+            }
 
-            if (x <= segment.left) {
+            if (x <= segment->get_left()) {
                 right = mid - 1;
-            } else if (x > segment.right) {
+            } else if (x > segment->get_right()) {
                 left = mid + 1;
             } else {
                 segment_index = mid;
@@ -42,19 +47,11 @@ Option<T> Interpolator<T>::evaluate(const Sequence<FunctionSegment<T>> &segments
         return Option<T>::None();
     }
 
-    // считаем значени полинома для этого x в выбранном сегменте
-    // по схеме Горнера
-    const FunctionSegment<T> &segment = segments.get(segment_index);
-    const int coefficient_count = segment.coefficients.get_size();
-    if (coefficient_count == 0) {
+    
+    const Function<T> *segment = segments.get(segment_index);
+    if (segment == nullptr) {
         return Option<T>::None();
     }
-
-    const T dx = x - segment.left;
-    T value = segment.coefficients.get(coefficient_count - 1);
-    for (int index = coefficient_count - 2; index >= 0; --index) {
-        value = value * dx + segment.coefficients.get(index);
-    }
-
-    return Option<T>::Some(value);
+    
+    return segment->try_evaluate(x);
 }

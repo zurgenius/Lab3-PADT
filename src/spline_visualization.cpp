@@ -1,5 +1,6 @@
 #include "spline_visualization.h"
 
+#include "array_sequence.h"
 #include "cubic_spline.h"
 #include "dynamic_array.h"
 #include "linear_spline.h"
@@ -19,11 +20,6 @@
 // Убираем GLFW_INCLUDE_NONE, чтобы GLFW сам включил нужный OpenGL заголовок
 #include <GLFW/glfw3.h>
 
-// Но на macOS нужен дополнительный флаг для подавления предупреждений об устаревании OpenGL
-#if defined(__APPLE__)
-#include <OpenGL/gl3.h>
-#endif
-
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
@@ -32,6 +28,13 @@
 namespace {
 
 constexpr int kPlotSamples = 500; // на сколько дискретных точек разбивается функция для отрисовки
+constexpr double kSineMinX = 0.0;
+constexpr double kSineMaxX = 6.0;
+constexpr double kSineNodeStep = 0.5;
+constexpr double kSineZoomMinX = 0.5;
+constexpr double kSineZoomMaxX = 2.7;
+constexpr double kSineZoomMinY = 0.35;
+constexpr double kSineZoomMaxY = 1.04;
 
 // данные графика
 struct PlotData {
@@ -39,6 +42,13 @@ struct PlotData {
     DynamicArray<double> node_y;
     DynamicArray<double> spline_x;
     DynamicArray<double> spline_y;
+    DynamicArray<double> reference_x;
+    DynamicArray<double> reference_y;
+};
+
+enum class ViewerMode {
+    Points,
+    Sine,
 };
 
 struct InterpolatorOption {
@@ -46,11 +56,25 @@ struct InterpolatorOption {
     Interpolator<double> *interpolator;
 };
 
+void destroy_segments(Sequence<Function<double> *> *&segments) {
+    if (segments == nullptr) {
+        return;
+    }
+
+    for (int index = 0; index < segments->get_count(); ++index) {
+        delete segments->get(index);
+    }
+    delete segments;
+    segments = nullptr;
+}
+
 void clear_plot_data(PlotData &data) {
     data.node_x.resize(0);
     data.node_y.resize(0);
     data.spline_x.resize(0);
     data.spline_y.resize(0);
+    data.reference_x.resize(0);
+    data.reference_y.resize(0);
 }
 
 void collect_nodes(const Sequence<Point<double>> &points, PlotData &data) {
@@ -114,14 +138,13 @@ bool parse_point_input(const char *x_text, const char *y_text, Point<double> &po
 }
 
 bool rebuild_spline(const Sequence<Point<double>> &points, Interpolator<double> &interpolator,
-                    Sequence<FunctionSegment<double>> *&segments, std::string &message) {
+                    Sequence<Function<double> *> *&segments, std::string &message) {
     try {
-        Sequence<FunctionSegment<double>> *new_segments = interpolator.interpolate(points);
-        delete segments;
+        Sequence<Function<double> *> *new_segments = interpolator.interpolate(points);
+        destroy_segments(segments);
         segments = new_segments;
     } catch (const std::exception &error) {
-        delete segments;
-        segments = nullptr;
+        destroy_segments(segments);
         message = error.what();
         return false;
     }
@@ -131,7 +154,7 @@ bool rebuild_spline(const Sequence<Point<double>> &points, Interpolator<double> 
 }
 
 bool refresh_plot(const Sequence<Point<double>> &points, Interpolator<double> &interpolator,
-                  const Sequence<FunctionSegment<double>> *segments, PlotData &data,
+                  const Sequence<Function<double> *> *segments, PlotData &data,
                   std::string &message) {
     collect_nodes(points, data);
     data.spline_x.resize(0);
@@ -167,9 +190,66 @@ bool refresh_plot(const Sequence<Point<double>> &points, Interpolator<double> &i
     return true;
 }
 
+bool rebuild_and_refresh(const Sequence<Point<double>> &points, Interpolator<double> &interpolator,
+                         Sequence<Function<double> *> *&segments, PlotData &data,
+                         std::string &message) {
+    bool spline_ready = rebuild_spline(points, interpolator, segments, message);
+    if (spline_ready) {
+        spline_ready = refresh_plot(points, interpolator, segments, data, message);
+    } else {
+        refresh_plot(points, interpolator, segments, data, message);
+    }
+    return spline_ready;
+}
+
+void fill_sine_nodes(MutableArraySequence<Point<double>> &points, double min_x, double max_x,
+                     double step) {
+    if (step <= 0.0 || min_x >= max_x) {
+        return;
+    }
+
+    for (double x = min_x; x <= max_x + step * 0.5; x += step) {
+        points.append(Point<double>{x, std::sin(x)});
+    }
+}
+
+void fill_sine_reference(PlotData &data, double min_x, double max_x) {
+    data.reference_x.resize(kPlotSamples);
+    data.reference_y.resize(kPlotSamples);
+
+    for (int index = 0; index < kPlotSamples; ++index) {
+        const double t = static_cast<double>(index) / static_cast<double>(kPlotSamples - 1);
+        const double x = min_x + (max_x - min_x) * t;
+        data.reference_x.set(index, x);
+        data.reference_y.set(index, std::sin(x));
+    }
+}
+
+void initialize_sine_state(MutableArraySequence<Point<double>> *&points,
+                           Sequence<Function<double> *> *&segments,
+                           Interpolator<double> &interpolator, PlotData &data, bool &spline_ready,
+                           std::string &message) {
+    if (points != nullptr) {
+        delete points;
+    }
+    points = new MutableArraySequence<Point<double>>();
+    destroy_segments(segments);
+    segments = nullptr;
+    clear_plot_data(data);
+
+    fill_sine_nodes(*points, kSineMinX, kSineMaxX, kSineNodeStep);
+    if (points->get_count() >= 2) {
+        spline_ready = rebuild_and_refresh(*points, interpolator, segments, data, message);
+    } else {
+        message = "Not enough points to build sine interpolation";
+        spline_ready = false;
+    }
+    fill_sine_reference(data, kSineMinX, kSineMaxX);
+}
+
 bool add_point(MutableArraySequence<Point<double>> &points, const Point<double> &point,
                bool to_beginning, Interpolator<double> &interpolator,
-               Sequence<FunctionSegment<double>> *&segments, std::string &message) {
+               Sequence<Function<double> *> *&segments, std::string &message) {
     if (to_beginning) {
         if (!is_valid_prepend(points, point, message)) {
             return false;
@@ -198,8 +278,8 @@ bool add_point(MutableArraySequence<Point<double>> &points, const Point<double> 
 }
 
 bool add_point_sorted(MutableArraySequence<Point<double>> &points, const Point<double> &point,
-                      Interpolator<double> &interpolator,
-                      Sequence<FunctionSegment<double>> *&segments, std::string &message) {
+                      Interpolator<double> &interpolator, Sequence<Function<double> *> *&segments,
+                      std::string &message) {
     int insert_index = 0;
     while (insert_index < points.get_count() && points.get(insert_index).x < point.x) {
         ++insert_index;
@@ -250,35 +330,50 @@ void draw_points_table(const PlotData &data) {
     ImGui::EndTable();
 }
 
-std::string format_segment(const FunctionSegment<double> &segment) {
+std::string format_segment(const Function<double> *segment) {
     std::string result;
     char buffer[160];
-    const int coefficient_count = segment.coefficients.get_size();
+    if (segment == nullptr) {
+        return "<null>";
+    }
+
+    const PolynomialFunction<double> *poly =
+        dynamic_cast<const PolynomialFunction<double> *>(segment);
+    if (poly == nullptr) {
+        std::snprintf(buffer, sizeof(buffer), "f(x), %.6g <= x <= %.6g", segment->get_left(),
+                      segment->get_right());
+        return std::string(buffer);
+    }
+
+    const DynamicArray<double> &coefficients = poly->get_coefficients();
+    const int coefficient_count = coefficients.get_size();
 
     if (coefficient_count == 0) {
         result = "0";
     }
 
     for (int index = 0; index < coefficient_count; ++index) {
-        const double coefficient = segment.coefficients.get(index);
+        const double coefficient = coefficients.get(index);
         if (index == 0) {
             std::snprintf(buffer, sizeof(buffer), "%.6g", coefficient);
         } else if (index == 1) {
-            std::snprintf(buffer, sizeof(buffer), " + %.6g(x - %.6g)", coefficient, segment.left);
+            std::snprintf(buffer, sizeof(buffer), " + %.6g(x - %.6g)", coefficient,
+                          poly->get_left());
         } else {
-            std::snprintf(buffer, sizeof(buffer), " + %.6g(x - %.6g)^%d", coefficient, segment.left,
-                          index);
+            std::snprintf(buffer, sizeof(buffer), " + %.6g(x - %.6g)^%d", coefficient,
+                          poly->get_left(), index);
         }
         result += buffer;
     }
 
-    std::snprintf(buffer, sizeof(buffer), ", %.6g <= x <= %.6g", segment.left, segment.right);
+    std::snprintf(buffer, sizeof(buffer), ", %.6g <= x <= %.6g", poly->get_left(),
+                  poly->get_right());
     result += buffer;
     return result;
 }
 
 // пишем уравнение кусочно заданной функции - кубического сплайна в аналитическом виде
-void draw_piecewise_system(const Sequence<FunctionSegment<double>> *segments, bool spline_ready) {
+void draw_piecewise_system(const Sequence<Function<double> *> *segments, bool spline_ready) {
     ImGui::TextUnformatted("Piecewise form");
     ImGui::Separator();
 
@@ -306,12 +401,18 @@ void run_spline_viewer(InterpolatorOption *interpolators, int interpolator_count
         return;
     }
 
-    PlotData data;
-    std::string status = "Create a point sequence";
+    PlotData points_data;
+    std::string points_status = "Create a point sequence";
+    PlotData sine_data;
+    std::string sine_status = "Comparison interpolation ready";
     char input_x[64] = "0";
     char input_y[64] = "0";
-    bool spline_ready = false;
+    bool points_ready = false;
+    bool sine_ready = false;
     int current_interpolator_index = 0;
+    int points_interpolator_index = 0;
+    int sine_interpolator_index = 0;
+    ViewerMode mode = ViewerMode::Points;
 
     // Инициализация GLFW + ImGui + ImPlot
     if (!glfwInit()) {
@@ -343,7 +444,12 @@ void run_spline_viewer(InterpolatorOption *interpolators, int interpolator_count
     ImGui_ImplOpenGL3_Init(glsl_version);
 
     MutableArraySequence<Point<double>> *points = new MutableArraySequence<Point<double>>();
-    Sequence<FunctionSegment<double>> *segments = nullptr;
+    Sequence<Function<double> *> *segments = nullptr;
+    MutableArraySequence<Point<double>> *sine_points = new MutableArraySequence<Point<double>>();
+    Sequence<Function<double> *> *sine_segments = nullptr;
+    initialize_sine_state(sine_points, sine_segments,
+                          *interpolators[current_interpolator_index].interpolator, sine_data,
+                          sine_ready, sine_status);
 
     // Главный цикл окна
     while (!glfwWindowShouldClose(window)) {
@@ -363,6 +469,31 @@ void run_spline_viewer(InterpolatorOption *interpolators, int interpolator_count
         ImGui::Text("Spline points");
         ImGui::Separator();
 
+        ImGui::Text("Mode");
+        bool is_points_mode = mode == ViewerMode::Points;
+        bool is_sine_mode = mode == ViewerMode::Sine;
+        if (ImGui::RadioButton("Points", is_points_mode)) {
+            mode = ViewerMode::Points;
+            if (points_interpolator_index != current_interpolator_index &&
+                points->get_count() >= 2) {
+                points_ready = rebuild_and_refresh(
+                    *points, *interpolators[current_interpolator_index].interpolator, segments,
+                    points_data, points_status);
+                points_interpolator_index = current_interpolator_index;
+            }
+        }
+        if (ImGui::RadioButton("Comparison", is_sine_mode)) {
+            mode = ViewerMode::Sine;
+            if (sine_interpolator_index != current_interpolator_index) {
+                sine_ready = rebuild_and_refresh(
+                    *sine_points, *interpolators[current_interpolator_index].interpolator,
+                    sine_segments, sine_data, sine_status);
+                fill_sine_reference(sine_data, kSineMinX, kSineMaxX);
+                sine_interpolator_index = current_interpolator_index;
+            }
+        }
+        ImGui::Separator();
+
         ImGui::Text("Algorithm");
         for (int index = 0; index < interpolator_count; ++index) {
             if (interpolators[index].interpolator == nullptr) {
@@ -370,82 +501,88 @@ void run_spline_viewer(InterpolatorOption *interpolators, int interpolator_count
             }
             if (ImGui::Button(interpolators[index].name, ImVec2(-1.0f, 0.0f))) {
                 current_interpolator_index = index;
-                if (points->get_count() >= 2) {
-                    spline_ready = rebuild_spline(*points, *interpolators[index].interpolator,
-                                                  segments, status);
-                    if (spline_ready) {
-                        spline_ready = refresh_plot(*points, *interpolators[index].interpolator,
-                                                    segments, data, status);
+                if (mode == ViewerMode::Points) {
+                    if (points->get_count() >= 2) {
+                        points_ready =
+                            rebuild_and_refresh(*points, *interpolators[index].interpolator,
+                                                segments, points_data, points_status);
                     } else {
-                        refresh_plot(*points, *interpolators[index].interpolator, segments, data,
-                                     status);
+                        destroy_segments(segments);
+                        points_data.spline_x.resize(0);
+                        points_data.spline_y.resize(0);
+                        points_status = std::string(interpolators[index].name) + " selected";
+                        points_ready = false;
                     }
+                    points_interpolator_index = index;
                 } else {
-                    delete segments;
-                    segments = nullptr;
-                    data.spline_x.resize(0);
-                    data.spline_y.resize(0);
-                    status = std::string(interpolators[index].name) + " selected";
-                    spline_ready = false;
+                    sine_ready =
+                        rebuild_and_refresh(*sine_points, *interpolators[index].interpolator,
+                                            sine_segments, sine_data, sine_status);
+                    fill_sine_reference(sine_data, kSineMinX, kSineMaxX);
+                    sine_interpolator_index = index;
                 }
             }
         }
         ImGui::Separator();
 
-        ImGui::SetNextItemWidth(-1.0f);
-        ImGui::InputText("x", input_x, sizeof(input_x));
-        ImGui::SetNextItemWidth(-1.0f);
-        ImGui::InputText("y", input_y, sizeof(input_y));
+        if (mode == ViewerMode::Points) {
+            ImGui::SetNextItemWidth(-1.0f);
+            ImGui::InputText("x", input_x, sizeof(input_x));
+            ImGui::SetNextItemWidth(-1.0f);
+            ImGui::InputText("y", input_y, sizeof(input_y));
 
-        if (ImGui::Button("Add begin", ImVec2(-1.0f, 0.0f))) {
-            Point<double> point{};
-            if (parse_point_input(input_x, input_y, point, status) &&
-                add_point(*points, point, true,
-                          *interpolators[current_interpolator_index].interpolator, segments,
-                          status)) {
-                spline_ready =
-                    refresh_plot(*points, *interpolators[current_interpolator_index].interpolator,
-                                 segments, data, status);
+            if (ImGui::Button("Add begin", ImVec2(-1.0f, 0.0f))) {
+                Point<double> point{};
+                if (parse_point_input(input_x, input_y, point, points_status) &&
+                    add_point(*points, point, true,
+                              *interpolators[current_interpolator_index].interpolator, segments,
+                              points_status)) {
+                    points_ready = refresh_plot(
+                        *points, *interpolators[current_interpolator_index].interpolator, segments,
+                        points_data, points_status);
+                }
             }
-        }
-        if (ImGui::Button("Add end", ImVec2(-1.0f, 0.0f))) {
-            Point<double> point{};
-            if (parse_point_input(input_x, input_y, point, status) &&
-                add_point(*points, point, false,
-                          *interpolators[current_interpolator_index].interpolator, segments,
-                          status)) {
-                spline_ready =
-                    refresh_plot(*points, *interpolators[current_interpolator_index].interpolator,
-                                 segments, data, status);
+            if (ImGui::Button("Add end", ImVec2(-1.0f, 0.0f))) {
+                Point<double> point{};
+                if (parse_point_input(input_x, input_y, point, points_status) &&
+                    add_point(*points, point, false,
+                              *interpolators[current_interpolator_index].interpolator, segments,
+                              points_status)) {
+                    points_ready = refresh_plot(
+                        *points, *interpolators[current_interpolator_index].interpolator, segments,
+                        points_data, points_status);
+                }
             }
-        }
-        if (ImGui::Button("Rebuild interpolation", ImVec2(-1.0f, 0.0f))) {
-            spline_ready = rebuild_spline(
-                *points, *interpolators[current_interpolator_index].interpolator, segments, status);
-            if (spline_ready) {
-                spline_ready =
-                    refresh_plot(*points, *interpolators[current_interpolator_index].interpolator,
-                                 segments, data, status);
-            } else {
-                refresh_plot(*points, *interpolators[current_interpolator_index].interpolator,
-                             segments, data, status);
+            if (ImGui::Button("Rebuild interpolation", ImVec2(-1.0f, 0.0f))) {
+                points_ready = rebuild_and_refresh(
+                    *points, *interpolators[current_interpolator_index].interpolator, segments,
+                    points_data, points_status);
             }
-        }
-        if (ImGui::Button("Clear", ImVec2(-1.0f, 0.0f))) {
-            delete points;
-            delete segments;
-            points = new MutableArraySequence<Point<double>>();
-            segments = nullptr;
-            clear_plot_data(data);
-            spline_ready = false;
-            status = "Create a point sequence";
+            if (ImGui::Button("Clear", ImVec2(-1.0f, 0.0f))) {
+                delete points;
+                destroy_segments(segments);
+                points = new MutableArraySequence<Point<double>>();
+                segments = nullptr;
+                clear_plot_data(points_data);
+                points_ready = false;
+                points_status = "Create a point sequence";
+            }
+        } else {
+            ImGui::Text("Sine range: [%.3f, %.3f]", kSineMinX, kSineMaxX);
+            ImGui::Text("Node step: %.3f", kSineNodeStep);
         }
 
         ImGui::Separator();
-        ImGui::TextWrapped("%s", status.c_str());
+        std::string &active_status = (mode == ViewerMode::Points) ? points_status : sine_status;
+        MutableArraySequence<Point<double>> *active_points =
+            (mode == ViewerMode::Points) ? points : sine_points;
+        PlotData &active_data = (mode == ViewerMode::Points) ? points_data : sine_data;
+        bool &active_ready = (mode == ViewerMode::Points) ? points_ready : sine_ready;
+
+        ImGui::TextWrapped("%s", active_status.c_str());
         ImGui::Text("Algorithm: %s", interpolators[current_interpolator_index].name);
-        ImGui::Text("Points: %d", points->get_count());
-        draw_points_table(data);
+        ImGui::Text("Points: %d", active_points->get_count());
+        draw_points_table(active_data);
         ImGui::EndChild();
 
         ImGui::SameLine();
@@ -456,34 +593,78 @@ void run_spline_viewer(InterpolatorOption *interpolators, int interpolator_count
             plot_height = 220.0f;
         }
 
-        if (ImPlot::BeginPlot("Spline interpolation", ImVec2(-1.0f, plot_height))) {
-            ImPlot::SetupAxes("x", "y");
-            if (ImPlot::IsPlotHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-                const ImPlotPoint mouse_position = ImPlot::GetPlotMousePos();
-                const Point<double> point{mouse_position.x, mouse_position.y};
-                if (add_point_sorted(*points, point,
-                                     *interpolators[current_interpolator_index].interpolator,
-                                     segments, status)) {
-                    spline_ready = refresh_plot(
-                        *points, *interpolators[current_interpolator_index].interpolator, segments,
-                        data, status);
+        if (mode == ViewerMode::Points) {
+            if (ImPlot::BeginPlot("Spline interpolation", ImVec2(-1.0f, plot_height))) {
+                ImPlot::SetupAxes("x", "y");
+                if (ImPlot::IsPlotHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+                    const ImPlotPoint mouse_position = ImPlot::GetPlotMousePos();
+                    const Point<double> point{mouse_position.x, mouse_position.y};
+                    if (add_point_sorted(*points, point,
+                                         *interpolators[current_interpolator_index].interpolator,
+                                         segments, points_status)) {
+                        points_ready = refresh_plot(
+                            *points, *interpolators[current_interpolator_index].interpolator,
+                            segments, points_data, points_status);
+                    }
                 }
+
+                if (points_ready && points_data.spline_x.get_size() > 0) {
+                    ImPlot::PlotLine("Interpolation", &points_data.spline_x.get(0),
+                                     &points_data.spline_y.get(0), points_data.spline_x.get_size());
+                }
+                if (points_data.node_x.get_size() > 0) {
+                    ImPlot::SetNextMarkerStyle(ImPlotMarker_Circle);
+                    ImPlot::PlotScatter("Nodes", &points_data.node_x.get(0),
+                                        &points_data.node_y.get(0), points_data.node_x.get_size());
+                }
+                ImPlot::EndPlot();
             }
-            if (spline_ready && data.spline_x.get_size() > 0) {
-                ImPlot::PlotLine("Spline", &data.spline_x.get(0), &data.spline_y.get(0),
-                                 data.spline_x.get_size());
+        } else {
+            if (ImPlot::BeginPlot("sin(x) and interpolation", ImVec2(-1.0f, plot_height))) {
+                ImPlot::SetupAxes("x", "y");
+                ImPlot::SetupAxesLimits(kSineZoomMinX, kSineZoomMaxX, kSineZoomMinY, kSineZoomMaxY,
+                                        ImPlotCond_Once);
+                if (sine_ready &&
+                    sine_data.reference_x.get_size() == sine_data.spline_y.get_size() &&
+                    sine_data.reference_x.get_size() > 0) {
+                    ImPlot::SetNextFillStyle(ImVec4(0.95f, 0.45f, 0.1f, 1.0f), 0.22f);
+                    ImPlot::PlotShaded("Difference", &sine_data.reference_x.get(0),
+                                       &sine_data.reference_y.get(0), &sine_data.spline_y.get(0),
+                                       sine_data.reference_x.get_size());
+                }
+                if (sine_data.reference_x.get_size() > 0) {
+                    ImPlot::SetNextLineStyle(ImVec4(0.2f, 0.7f, 0.25f, 1.0f), 1.6f);
+                    ImPlot::PlotLine("sin(x)", &sine_data.reference_x.get(0),
+                                     &sine_data.reference_y.get(0),
+                                     sine_data.reference_x.get_size());
+                }
+                if (sine_ready && sine_data.spline_x.get_size() > 0) {
+                    ImPlot::SetNextLineStyle(ImVec4(0.95f, 0.45f, 0.1f, 1.0f), 1.9f);
+                    if (std::string(interpolators[current_interpolator_index].name) == "Linear" &&
+                        sine_data.node_x.get_size() > 0) {
+                        ImPlot::PlotLine("Interpolation", &sine_data.node_x.get(0),
+                                         &sine_data.node_y.get(0), sine_data.node_x.get_size());
+                    } else {
+                        ImPlot::PlotLine("Interpolation", &sine_data.spline_x.get(0),
+                                         &sine_data.spline_y.get(0), sine_data.spline_x.get_size());
+                    }
+                }
+                if (sine_data.node_x.get_size() > 0) {
+                    ImPlot::SetNextMarkerStyle(ImPlotMarker_Circle, 5.0f,
+                                               ImVec4(0.1f, 0.2f, 0.9f, 1.0f), 1.5f,
+                                               ImVec4(1.0f, 1.0f, 1.0f, 1.0f));
+                    ImPlot::PlotScatter("Nodes", &sine_data.node_x.get(0), &sine_data.node_y.get(0),
+                                        sine_data.node_x.get_size());
+                }
+                ImPlot::EndPlot();
             }
-            if (data.node_x.get_size() > 0) {
-                ImPlot::SetNextMarkerStyle(ImPlotMarker_Circle);
-                ImPlot::PlotScatter("Nodes", &data.node_x.get(0), &data.node_y.get(0),
-                                    data.node_x.get_size());
-            }
-            ImPlot::EndPlot();
         }
 
         ImGui::Spacing();
         ImGui::BeginChild("PiecewiseSystem", ImVec2(0.0f, 0.0f), true);
-        draw_piecewise_system(segments, spline_ready);
+        Sequence<Function<double> *> *active_segments =
+            (mode == ViewerMode::Points) ? segments : sine_segments;
+        draw_piecewise_system(active_segments, active_ready);
         ImGui::EndChild();
         ImGui::EndChild();
         ImGui::End();
@@ -507,7 +688,9 @@ void run_spline_viewer(InterpolatorOption *interpolators, int interpolator_count
     glfwDestroyWindow(window);
     glfwTerminate();
     delete points;
-    delete segments;
+    destroy_segments(segments);
+    delete sine_points;
+    destroy_segments(sine_segments);
     std::cout << "Graphical window closed. Returning to menu." << std::endl;
 }
 
