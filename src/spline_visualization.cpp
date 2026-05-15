@@ -28,13 +28,14 @@
 namespace {
 
 constexpr int kPlotSamples = 500; // на сколько дискретных точек разбивается функция для отрисовки
-constexpr double kSineMinX = 0.0;
-constexpr double kSineMaxX = 6.0;
+constexpr double kSineMinX = -1.0;
+constexpr double kSineMaxX = 1.0;
 constexpr double kSineNodeStep = 0.5;
-constexpr double kSineZoomMinX = 0.5;
-constexpr double kSineZoomMaxX = 2.7;
-constexpr double kSineZoomMinY = 0.35;
-constexpr double kSineZoomMaxY = 1.04;
+constexpr double kSineFrequency = 4.0;
+constexpr double kSineZoomMinX = -1.1;
+constexpr double kSineZoomMaxX = 1.1;
+constexpr double kSineZoomMinY = -1.5;
+constexpr double kSineZoomMaxY = 1.5;
 
 // данные графика
 struct PlotData {
@@ -55,6 +56,8 @@ struct InterpolatorOption {
     const char *name;
     Interpolator<double> *interpolator;
 };
+
+double reference_sine(double x) { return std::sin(kSineFrequency * x); }
 
 void destroy_segments(Sequence<Function<double> *> *&segments) {
     if (segments == nullptr) {
@@ -209,7 +212,7 @@ void fill_sine_nodes(MutableArraySequence<Point<double>> &points, double min_x, 
     }
 
     for (double x = min_x; x <= max_x + step * 0.5; x += step) {
-        points.append(Point<double>{x, std::sin(x)});
+        points.append(Point<double>{x, reference_sine(x)});
     }
 }
 
@@ -221,7 +224,7 @@ void fill_sine_reference(PlotData &data, double min_x, double max_x) {
         const double t = static_cast<double>(index) / static_cast<double>(kPlotSamples - 1);
         const double x = min_x + (max_x - min_x) * t;
         data.reference_x.set(index, x);
-        data.reference_y.set(index, std::sin(x));
+        data.reference_y.set(index, reference_sine(x));
     }
 }
 
@@ -569,6 +572,7 @@ void run_spline_viewer(InterpolatorOption *interpolators, int interpolator_count
             }
         } else {
             ImGui::Text("Sine range: [%.3f, %.3f]", kSineMinX, kSineMaxX);
+            ImGui::Text("Function: sin(%.6gx)", kSineFrequency);
             ImGui::Text("Node step: %.3f", kSineNodeStep);
         }
 
@@ -620,7 +624,7 @@ void run_spline_viewer(InterpolatorOption *interpolators, int interpolator_count
                 ImPlot::EndPlot();
             }
         } else {
-            if (ImPlot::BeginPlot("sin(x) and interpolation", ImVec2(-1.0f, plot_height))) {
+            if (ImPlot::BeginPlot("sin(4x) and interpolation", ImVec2(-1.0f, plot_height))) {
                 ImPlot::SetupAxes("x", "y");
                 ImPlot::SetupAxesLimits(kSineZoomMinX, kSineZoomMaxX, kSineZoomMinY, kSineZoomMaxY,
                                         ImPlotCond_Once);
@@ -634,7 +638,7 @@ void run_spline_viewer(InterpolatorOption *interpolators, int interpolator_count
                 }
                 if (sine_data.reference_x.get_size() > 0) {
                     ImPlot::SetNextLineStyle(ImVec4(0.2f, 0.7f, 0.25f, 1.0f), 1.6f);
-                    ImPlot::PlotLine("sin(x)", &sine_data.reference_x.get(0),
+                    ImPlot::PlotLine("sin(4x)", &sine_data.reference_x.get(0),
                                      &sine_data.reference_y.get(0),
                                      sine_data.reference_x.get_size());
                 }

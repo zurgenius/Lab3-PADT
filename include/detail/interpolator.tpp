@@ -47,11 +47,10 @@ Option<T> Interpolator<T>::evaluate(const Sequence<Function<T> *> &segments, con
         return Option<T>::None();
     }
 
-    
     const Function<T> *segment = segments.get(segment_index);
     if (segment == nullptr) {
         return Option<T>::None();
     }
-    
+
     return segment->try_evaluate(x);
 }
